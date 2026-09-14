@@ -50,6 +50,16 @@
     <string name="dimmer_brightness">Kecerahan</string>
     <string name="dimmer_hint">Atur tingkat peredupan 0%–100%</string>
 
+    <!-- Dimmer additions -->
+    <string name="dimmer_allow">Memungkinkan</string>
+    <string name="dimmer_on">ON</string>
+    <string name="dimmer_off">OFF</string>
+    <string name="dimmer_current_level">Tingkat: %1$d%%</string>
+    <string name="dimmer_notification_title">Peredupan aktif</string>
+    <string name="dimmer_notification_text">Ketuk untuk membuka Toolsku</string>
+    <string name="dimmer_channel_name">Peredupan Layar</string>
+    <string name="dimmer_channel_desc">Notifikasi saat peredupan aktif</string>
+
     <!-- Killer -->
     <string name="killer_title">Hentikan Aplikasi</string>
     <string name="killer_select_all">Pilih Semua</string>
