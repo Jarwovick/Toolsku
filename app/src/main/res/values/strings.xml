@@ -26,7 +26,7 @@
     <string name="onboarding_subtitle">Toolsku butuh beberapa izin untuk berfungsi</string>
 
     <string name="perm_accessibility_title">Layanan Aksesibilitas</string>
-    <string name="perm_accessibility_desc">Diperlukan untuk otomasi (hentikan aplikasi & bersihkan cache)</string>
+    <string name="perm_accessibility_desc">Diperlukan untuk otomasi (hentikan aplikasi &amp; bersihkan cache)</string>
 
     <string name="perm_overlay_title">Tampilkan di Atas Aplikasi</string>
     <string name="perm_overlay_desc">Diperlukan untuk peredupan layar dan overlay saat otomasi</string>
