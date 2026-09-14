@@ -23,6 +23,11 @@
         android:name="android.permission.WRITE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- Foreground service untuk dimmer -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".ToolskuApp"
         android:allowBackup="true"
@@ -112,6 +117,16 @@
         <service
             android:name=".overlay.BlockerOverlayService"
             android:exported="false" />
+
+        <!-- Dimmer foreground service -->
+        <service
+            android:name=".dimmer.DimmerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="screen_dimmer_overlay" />
+        </service>
 
     </application>
 
