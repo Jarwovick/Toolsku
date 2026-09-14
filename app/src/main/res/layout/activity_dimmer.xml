@@ -22,14 +22,6 @@
             android:textSize="28sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/dimmer_hint"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
-
         <!-- Card: Main Control -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -40,18 +32,9 @@
             android:padding="20dp">
 
             <!-- ON/OFF Row -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/dimmer_allow"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -62,7 +45,7 @@
                     android:layout_weight="1"
                     android:text="@string/dimmer_off"
                     android:textColor="@color/text_secondary"
-                    android:textSize="16sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
 
                 <Button
