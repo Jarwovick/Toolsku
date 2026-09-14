@@ -2,14 +2,13 @@ package com.toolsku.app
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.toolsku.app.boot.BootActivity
 import com.toolsku.app.cleaner.CleanerActivity
-import com.toolsku.app.core.PermissionHelper
-import com.toolsku.app.core.Prefs
 import com.toolsku.app.databinding.ActivityMainBinding
 import com.toolsku.app.dimmer.DimmerActivity
 import com.toolsku.app.killer.KillerActivity
@@ -21,16 +20,23 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
 
-        setupMenuCards()
-        checkPermissions()
-    }
+        try {
+            binding = ActivityMainBinding.inflate(layoutInflater)
+            setContentView(binding.root)
+        } catch (e: Exception) {
+            Log.e("Toolsku", "Failed to inflate layout", e)
+            e.printStackTrace()
+            finish()
+            return
+        }
 
-    override fun onResume() {
-        super.onResume()
-        checkPermissions()
+        try {
+            setupMenuCards()
+        } catch (e: Exception) {
+            Log.e("Toolsku", "Failed to setup menu", e)
+            e.printStackTrace()
+        }
     }
 
     private fun setupMenuCards() {
@@ -73,16 +79,6 @@ class MainActivity : AppCompatActivity() {
         // Settings
         binding.btnSettings.setOnClickListener {
             startActivity(Intent(this@MainActivity, PermissionActivity::class.java))
-        }
-    }
-
-    private fun checkPermissions() {
-        val hasAccessibility = PermissionHelper.isAccessibilityServiceEnabled(this)
-        val hasOverlay = PermissionHelper.canDrawOverlays(this)
-        val hasUsage = PermissionHelper.hasUsageAccess(this)
-
-        if (hasAccessibility && hasOverlay && hasUsage) {
-            Prefs.isFirstLaunch = false
         }
     }
 }
