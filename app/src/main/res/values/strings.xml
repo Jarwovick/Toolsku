@@ -67,6 +67,18 @@
     <string name="killer_close_apps">Hentikan Aplikasi (%1$d)</string>
     <string name="killer_exception_list">Daftar Pengecualian</string>
 
+    <!-- Killer test -->
+    <string name="killer_test_mode">🧪 TEST MODE</string>
+    <string name="killer_test_title">Kill WhatsApp</string>
+    <string name="killer_test_desc">Tombol ini akan membuka App Info WhatsApp, klik Paksa berhenti, dan konfirmasi.</string>
+    <string name="killer_test_button">🚀 JALANKAN TEST</string>
+    <string name="killer_test_ready">Siap</string>
+    <string name="killer_test_running">Menjalankan otomasi…</string>
+    <string name="killer_test_progress">Progress: %1$d/%2$d — %3$s</string>
+    <string name="killer_test_done">Selesai: %1$d sukses, %2$d gagal</string>
+    <string name="killer_test_no_accessibility">Aktifkan Aksesibilitas dulu</string>
+    <string name="killer_test_queue_busy">Gagal: queue sedang berjalan</string>
+
     <!-- Cleaner -->
     <string name="cleaner_title">Bersihkan Cache</string>
     <string name="cleaner_clear_all">Bersihkan Semua (%1$d)</string>
