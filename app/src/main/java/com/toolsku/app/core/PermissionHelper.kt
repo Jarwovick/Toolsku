@@ -33,29 +33,33 @@ object PermissionHelper {
     /**
      * Cek apakah usage access diizinkan (untuk ukuran cache).
      */
-        fun isAccessibilityServiceEnabled(context: Context): Boolean {
-        val expectedService = "${context.packageName}/${context.packageName}.automation.AutomationAccessibilityService"
-        val expectedServiceShort = "${context.packageName}/.automation.AutomationAccessibilityService"
-
-        val enabledServices = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ) ?: return false
-
-        val splitter = TextUtils.SimpleStringSplitter(':')
-        splitter.setString(enabledServices)
-        while (splitter.hasNext()) {
-            val component = splitter.next()
-            // Cek beberapa format
-            if (component.equals(expectedService, ignoreCase = true) ||
-                component.equals(expectedServiceShort, ignoreCase = true) ||
-                component.contains("${context.packageName}/") &&
-                    component.contains("AutomationAccessibilityService")
-            ) {
-                return true
+    fun hasUsageAccess(context: Context): Boolean {
+        return try {
+            val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                appOps.unsafeCheckOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    android.os.Process.myUid(),
+                    context.packageName
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                appOps.checkOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    android.os.Process.myUid(),
+                    context.packageName
+                )
             }
+            if (mode == AppOpsManager.MODE_DEFAULT) {
+                context.checkCallingOrSelfPermission(
+                    android.Manifest.permission.PACKAGE_USAGE_STATS
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            } else {
+                mode == AppOpsManager.MODE_ALLOWED
+            }
+        } catch (e: Exception) {
+            false
         }
-        return false
     }
 
     /**
@@ -67,9 +71,19 @@ object PermissionHelper {
 
     /**
      * Cek apakah accessibility service aktif.
+     *
+     * Kompatibel dengan beberapa format string di berbagai OEM:
+     * - "com.toolsku.app/com.toolsku.app.automation.AutomationAccessibilityService" (full)
+     * - "com.toolsku.app/.automation.AutomationAccessibilityService" (short)
+     *
+     * HANYA SATU method ini — jangan duplikat.
      */
     fun isAccessibilityServiceEnabled(context: Context): Boolean {
-        val service = "${context.packageName}/${context.packageName}.automation.AutomationAccessibilityService"
+        val expectedServiceFull =
+            "${context.packageName}/${context.packageName}.automation.AutomationAccessibilityService"
+        val expectedServiceShort =
+            "${context.packageName}/.automation.AutomationAccessibilityService"
+
         val enabledServices = Settings.Secure.getString(
             context.contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
@@ -79,7 +93,19 @@ object PermissionHelper {
         splitter.setString(enabledServices)
         while (splitter.hasNext()) {
             val component = splitter.next()
-            if (component.equals(service, ignoreCase = true)) {
+
+            // Cek format full
+            if (component.equals(expectedServiceFull, ignoreCase = true)) {
+                return true
+            }
+            // Cek format short
+            if (component.equals(expectedServiceShort, ignoreCase = true)) {
+                return true
+            }
+            // Cek fallback: mengandung package name + AutomationAccessibilityService
+            if (component.contains("${context.packageName}/") &&
+                component.contains("AutomationAccessibilityService")
+            ) {
                 return true
             }
         }
