@@ -13,10 +13,6 @@ import androidx.core.app.NotificationCompat
 import com.toolsku.app.MainActivity
 import com.toolsku.app.R
 
-/**
- * Foreground service yang menampilkan overlay peredupan.
- * Service ini tetap jalan meski app di background.
- */
 class DimmerService : Service() {
 
     companion object {
@@ -42,15 +38,22 @@ class DimmerService : Service() {
             ACTION_START -> {
                 val level = intent.getIntExtra(EXTRA_LEVEL, 50)
                 startForeground(NOTIFICATION_ID, buildNotification())
-                overlayManager.show(level / 100f)
+                // Level = tingkat kecerahan (0 = gelap penuh, 100 = terang)
+                // Alpha overlay = kebalikannya (0 = transparan, 1 = hitam penuh)
+                overlayManager.show((100 - level) / 100f)
             }
             ACTION_UPDATE -> {
                 val level = intent.getIntExtra(EXTRA_LEVEL, 50)
-                overlayManager.update(level / 100f)
+                overlayManager.update((100 - level) / 100f)
             }
             ACTION_STOP -> {
                 overlayManager.hide()
-                stopForeground(STOP_FOREGROUND_REMOVE)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
                 stopSelf()
             }
         }
