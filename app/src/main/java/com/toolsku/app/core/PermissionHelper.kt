@@ -33,33 +33,29 @@ object PermissionHelper {
     /**
      * Cek apakah usage access diizinkan (untuk ukuran cache).
      */
-    fun hasUsageAccess(context: Context): Boolean {
-        return try {
-            val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                appOps.unsafeCheckOpNoThrow(
-                    AppOpsManager.OPSTR_GET_USAGE_STATS,
-                    android.os.Process.myUid(),
-                    context.packageName
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                appOps.checkOpNoThrow(
-                    AppOpsManager.OPSTR_GET_USAGE_STATS,
-                    android.os.Process.myUid(),
-                    context.packageName
-                )
+        fun isAccessibilityServiceEnabled(context: Context): Boolean {
+        val expectedService = "${context.packageName}/${context.packageName}.automation.AutomationAccessibilityService"
+        val expectedServiceShort = "${context.packageName}/.automation.AutomationAccessibilityService"
+
+        val enabledServices = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+
+        val splitter = TextUtils.SimpleStringSplitter(':')
+        splitter.setString(enabledServices)
+        while (splitter.hasNext()) {
+            val component = splitter.next()
+            // Cek beberapa format
+            if (component.equals(expectedService, ignoreCase = true) ||
+                component.equals(expectedServiceShort, ignoreCase = true) ||
+                component.contains("${context.packageName}/") &&
+                    component.contains("AutomationAccessibilityService")
+            ) {
+                return true
             }
-            if (mode == AppOpsManager.MODE_DEFAULT) {
-                context.checkCallingOrSelfPermission(
-                    android.Manifest.permission.PACKAGE_USAGE_STATS
-                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            } else {
-                mode == AppOpsManager.MODE_ALLOWED
-            }
-        } catch (e: Exception) {
-            false
         }
+        return false
     }
 
     /**
