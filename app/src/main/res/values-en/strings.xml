@@ -46,6 +46,16 @@
     <string name="dimmer_brightness">Brightness</string>
     <string name="dimmer_hint">Adjust dimming level 0%–100%</string>
 
+    <!-- Dimmer additions -->
+    <string name="dimmer_allow">Allow</string>
+    <string name="dimmer_on">ON</string>
+    <string name="dimmer_off">OFF</string>
+    <string name="dimmer_current_level">Level: %1$d%%</string>
+    <string name="dimmer_notification_title">Dimming active</string>
+    <string name="dimmer_notification_text">Tap to open Toolsku</string>
+    <string name="dimmer_channel_name">Screen Dimmer</string>
+    <string name="dimmer_channel_desc">Notification when dimming is active</string>
+
     <string name="killer_title">Kill Apps</string>
     <string name="killer_select_all">Select All</string>
     <string name="killer_deselect_all">Deselect All</string>
