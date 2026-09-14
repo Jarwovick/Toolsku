@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Toolsku</string>
+    <string name="app_tagline">Toolbox Android</string>
+
+    <!-- Home -->
+    <string name="home_title">Toolsku</string>
+    <string name="home_subtitle">Pilih fitur</string>
+
+    <string name="menu_dimmer_title">Peredupan Layar</string>
+    <string name="menu_dimmer_desc">Atur tingkat kecerahan layar</string>
+
+    <string name="menu_cleaner_title">Bersihkan Cache</string>
+    <string name="menu_cleaner_desc">Hapus cache semua aplikasi</string>
+
+    <string name="menu_killer_title">Hentikan Aplikasi</string>
+    <string name="menu_killer_desc">Paksa berhenti aplikasi berjalan</string>
+
+    <string name="menu_boot_title">Menu Boot</string>
+    <string name="menu_boot_desc">Restart atau matikan perangkat</string>
+
+    <string name="menu_settings">Pengaturan</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">Izin Diperlukan</string>
+    <string name="onboarding_subtitle">Toolsku butuh beberapa izin untuk berfungsi</string>
+
+    <string name="perm_accessibility_title">Layanan Aksesibilitas</string>
+    <string name="perm_accessibility_desc">Diperlukan untuk otomasi (hentikan aplikasi & bersihkan cache)</string>
+
+    <string name="perm_overlay_title">Tampilkan di Atas Aplikasi</string>
+    <string name="perm_overlay_desc">Diperlukan untuk peredupan layar dan overlay saat otomasi</string>
+
+    <string name="perm_usage_title">Akses Penggunaan</string>
+    <string name="perm_usage_desc">Diperlukan untuk membaca ukuran cache aplikasi</string>
+
+    <string name="perm_granted">Aktif</string>
+    <string name="perm_not_granted">Belum aktif</string>
+    <string name="perm_grant">Aktifkan</string>
+    <string name="perm_open_settings">Buka Pengaturan</string>
+
+    <!-- Accessibility Service -->
+    <string name="accessibility_service_label">Toolsku Otomasi</string>
+    <string name="accessibility_service_description">Layanan ini memungkinkan Toolsku menghentikan aplikasi dan membersihkan cache secara otomatis.</string>
+
+    <!-- Dimmer -->
+    <string name="dimmer_title">Peredupan Layar</string>
+    <string name="dimmer_status_on">Aktif</string>
+    <string name="dimmer_status_off">Tidak Aktif</string>
+    <string name="dimmer_brightness">Kecerahan</string>
+    <string name="dimmer_hint">Atur tingkat peredupan 0%–100%</string>
+
+    <!-- Killer -->
+    <string name="killer_title">Hentikan Aplikasi</string>
+    <string name="killer_select_all">Pilih Semua</string>
+    <string name="killer_deselect_all">Batal Pilih</string>
+    <string name="killer_close_apps">Hentikan Aplikasi (%1$d)</string>
+    <string name="killer_exception_list">Daftar Pengecualian</string>
+
+    <!-- Cleaner -->
+    <string name="cleaner_title">Bersihkan Cache</string>
+    <string name="cleaner_clear_all">Bersihkan Semua (%1$d)</string>
+    <string name="cleaner_cache_label">Cache</string>
+
+    <!-- Boot -->
+    <string name="boot_title">Menu Boot</string>
+    <string name="boot_restart">Hidupkan Ulang</string>
+    <string name="boot_shutdown">Matikan</string>
+    <string name="boot_hint">Keduanya membuka menu power bawaan. Anda tetap perlu memilih opsi di menu tersebut.</string>
+    <string name="boot_not_supported">Fitur ini membutuhkan Android 12 atau lebih baru</string>
+
+    <!-- Overlay -->
+    <string name="overlay_cleaning">MEMBERSIHKAN…</string>
+    <string name="overlay_shutting">MENGHENTIKAN…</string>
+    <string name="overlay_stop">Hentikan</string>
+
+    <!-- Common -->
+    <string name="ok">OK</string>
+    <string name="cancel">Batal</string>
+    <string name="yes">Ya</string>
+    <string name="no">Tidak</string>
+    <string name="back">Kembali</string>
+    <string name="save">Simpan</string>
+    <string name="close">Tutup</string>
+
+    <!-- Shortcut -->
+    <string name="shortcut_short_label">Toolsku</string>
+    <string name="shortcut_long_label">Jalankan Toolsku</string>
+    <string name="shortcut_disabled">Toolsku</string>
+</resources>
