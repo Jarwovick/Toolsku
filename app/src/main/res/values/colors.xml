@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Background -->
+    <color name="bg_dark">#0B1220</color>
+    <color name="bg_surface">#111C33</color>
+    <color name="bg_surface_light">#14213D</color>
+
+    <!-- Accent (cyan) -->
+    <color name="accent">#29B6F6</color>
+    <color name="accent_light">#4FC3F7</color>
+    <color name="accent_dark">#0288D1</color>
+
+    <!-- Text -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#8FA3BF</color>
+    <color name="text_disabled">#4A5A73</color>
+
+    <!-- Status -->
+    <color name="danger">#EF5350</color>
+    <color name="warning">#FFD54F</color>
+    <color name="success">#66BB6A</color>
+
+    <!-- Divider -->
+    <color name="divider">#1E2D4A</color>
+
+    <!-- Transparent -->
+    <color name="transparent">#00000000</color>
+</resources>
