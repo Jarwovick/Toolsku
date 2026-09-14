@@ -3,9 +3,12 @@ package com.toolsku.app.dimmer
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
+import android.widget.Button
 import android.widget.SeekBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -19,6 +22,11 @@ class DimmerActivity : AppCompatActivity() {
     private var isDimmingActive = false
     private var currentLevel = 50
 
+    private lateinit var seekBar: SeekBar
+    private lateinit var tvLevel: TextView
+    private lateinit var tvStatus: TextView
+    private lateinit var btnToggle: Button
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_dimmer)
@@ -27,16 +35,17 @@ class DimmerActivity : AppCompatActivity() {
         currentLevel = Prefs.dimmerLevel
         isDimmingActive = Prefs.dimmerEnabled
 
+        seekBar = findViewById(R.id.seekBar)
+        tvLevel = findViewById(R.id.tvLevel)
+        tvStatus = findViewById(R.id.tvStatus)
+        btnToggle = findViewById(R.id.btnToggle)
+
         setupUI()
         requestNotificationPermissionIfNeeded()
     }
 
     private fun setupUI() {
-        val seekBar = findViewById<SeekBar>(R.id.seekBar)
-        val tvLevel = findViewById<android.widget.TextView>(R.id.tvLevel)
-        val tvStatus = findViewById<android.widget.TextView>(R.id.tvStatus)
-        val btnToggle = findViewById<android.widget.Button>(R.id.btnToggle)
-
+        // Slider = tingkat kecerahan (0 = gelap penuh, 100 = terang)
         seekBar.progress = currentLevel
         tvLevel.text = getString(R.string.dimmer_current_level, currentLevel)
 
@@ -54,7 +63,7 @@ class DimmerActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(sb: SeekBar?) {}
         })
 
-        updateStatusUI(tvStatus, btnToggle)
+        updateStatusUI()
 
         btnToggle.setOnClickListener {
             if (!PermissionHelper.canDrawOverlays(this)) {
@@ -69,23 +78,23 @@ class DimmerActivity : AppCompatActivity() {
                 startDimming()
             }
 
-            updateStatusUI(tvStatus, btnToggle)
+            updateStatusUI()
         }
     }
 
-    private fun updateStatusUI(tvStatus: android.widget.TextView, btnToggle: android.widget.Button) {
+    private fun updateStatusUI() {
         if (isDimmingActive) {
             tvStatus.text = getString(R.string.dimmer_on)
             tvStatus.setTextColor(ContextCompat.getColor(this, R.color.accent))
             btnToggle.text = getString(R.string.dimmer_off)
             btnToggle.backgroundTintList =
-                android.content.res.ColorStateList.valueOf(ContextCompat.getColor(this, R.color.danger))
+                ColorStateList.valueOf(ContextCompat.getColor(this, R.color.danger))
         } else {
             tvStatus.text = getString(R.string.dimmer_off)
             tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
             btnToggle.text = getString(R.string.dimmer_on)
             btnToggle.backgroundTintList =
-                android.content.res.ColorStateList.valueOf(ContextCompat.getColor(this, R.color.accent))
+                ColorStateList.valueOf(ContextCompat.getColor(this, R.color.accent))
         }
     }
 
@@ -128,9 +137,6 @@ class DimmerActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Sync status jika user ubah izin dari Settings
-        val tvStatus = findViewById<android.widget.TextView>(R.id.tvStatus)
-        val btnToggle = findViewById<android.widget.Button>(R.id.btnToggle)
-        updateStatusUI(tvStatus, btnToggle)
+        updateStatusUI()
     }
 }
