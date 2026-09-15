@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
@@ -20,10 +22,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.toolsku.app.R
-import com.toolsku.app.automation.ActionStep
-import com.toolsku.app.automation.AutomationAccessibilityService
-import com.toolsku.app.automation.AutomationTask
-import com.toolsku.app.automation.OemProfile
 import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.Prefs
@@ -33,7 +31,9 @@ class KillerActivity : AppCompatActivity() {
 
     private lateinit var adapter: KillerAdapter
     private lateinit var tvHeaderTitle: TextView
+    private lateinit var tvFilterLabel: TextView
     private lateinit var btnSelectAll: ImageButton
+    private lateinit var btnRefresh: ImageButton
     private lateinit var btnCloseApps: Button
     private lateinit var progressRam: ProgressBar
     private lateinit var barRam: ProgressBar
@@ -52,7 +52,9 @@ class KillerActivity : AppCompatActivity() {
         title = getString(R.string.killer_title)
 
         tvHeaderTitle = findViewById(R.id.tvHeaderTitle)
+        tvFilterLabel = findViewById(R.id.tvFilterLabel)
         btnSelectAll = findViewById(R.id.btnSelectAll)
+        btnRefresh = findViewById(R.id.btnRefresh)
         btnCloseApps = findViewById(R.id.btnCloseApps)
         progressRam = findViewById(R.id.progressRam)
         barRam = findViewById(R.id.barRam)
@@ -63,6 +65,7 @@ class KillerActivity : AppCompatActivity() {
         tvLoading = findViewById(R.id.tvLoading)
 
         tvHeaderTitle.text = getString(R.string.header_kill_apps_running)
+        tvFilterLabel.text = getString(R.string.killer_filter_user_apps)
 
         adapter = KillerAdapter(
             onItemClick = { updateButtonCount() },
@@ -71,6 +74,14 @@ class KillerActivity : AppCompatActivity() {
         findViewById<RecyclerView>(R.id.rvApps).apply {
             layoutManager = LinearLayoutManager(this@KillerActivity)
             adapter = this@KillerActivity.adapter
+        }
+
+        findViewById<android.widget.LinearLayout>(R.id.btnFilter).setOnClickListener {
+            showFilterMenu()
+        }
+
+        btnRefresh.setOnClickListener {
+            loadRunningApps()
         }
 
         btnSelectAll.setOnClickListener {
@@ -98,9 +109,6 @@ class KillerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateRamInfo()
-        if (!isProcessing) {
-            loadRunningApps()
-        }
     }
 
     // ==== DATA ====
@@ -110,10 +118,8 @@ class KillerActivity : AppCompatActivity() {
         tvLoading.text = getString(R.string.killer_loading)
 
         lifecycleScope.launch {
-            val runningApps = AppRepository.getRunningApps(
-                this@KillerActivity,
-                fallbackToAllApps = true
-            ).map { it.toKillerItem() }
+            val runningApps = AppRepository.getRunningApps(this@KillerActivity)
+                .map { it.toKillerItem() }
 
             adapter.submitList(runningApps)
             allSelected = runningApps.isNotEmpty()
@@ -140,6 +146,25 @@ class KillerActivity : AppCompatActivity() {
             isException = this.isException,
             selected = true
         )
+    }
+
+    private fun showFilterMenu() {
+        val popup = PopupMenu(this, findViewById(R.id.btnFilter))
+        popup.menu.add(0, 0, 0, getString(R.string.killer_filter_user_apps))
+        popup.menu.add(0, 1, 1, getString(R.string.killer_filter_system_apps))
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                0 -> {
+                    tvFilterLabel.text = getString(R.string.killer_filter_user_apps)
+                    loadRunningApps()
+                }
+                1 -> {
+                    Toast.makeText(this, "System apps — coming soon", Toast.LENGTH_SHORT).show()
+                }
+            }
+            true
+        }
+        popup.show()
     }
 
     // ==== RAM ====
@@ -245,12 +270,6 @@ class KillerActivity : AppCompatActivity() {
             return
         }
 
-        val service = AutomationAccessibilityService.instance
-        if (service == null) {
-            Toast.makeText(this, R.string.killer_test_no_accessibility, Toast.LENGTH_LONG).show()
-            return
-        }
-
         AlertDialog.Builder(this)
             .setTitle("Hentikan ${selected.size} aplikasi?")
             .setMessage("Aplikasi akan dihentikan paksa.")
@@ -263,41 +282,42 @@ class KillerActivity : AppCompatActivity() {
         isProcessing = true
         updateButtonCount()
 
-        val tasks = apps.map { app ->
-            val steps = mutableListOf<ActionStep>()
-            steps.add(ActionStep.OpenAppInfo(app.packageName))
-            steps.add(ActionStep.Wait(900))
-            steps.add(ActionStep.ClickByText(OemProfile.forceStopButtonLabels))
-            steps.add(ActionStep.Wait(600))
-            steps.add(ActionStep.ClickByText(OemProfile.forceStopConfirmLabels))
-            steps.add(ActionStep.Wait(600))
-            steps.add(ActionStep.Back)
-            steps.add(ActionStep.Wait(300))
-            steps.add(ActionStep.Back)
-            steps.add(ActionStep.Wait(300))
-            AutomationTask(app.packageName, steps)
-        }
+        Toast.makeText(this, "Memproses ${apps.size} aplikasi…", Toast.LENGTH_SHORT).show()
 
-        val service = AutomationAccessibilityService.instance ?: return
-        service.runQueue(
-            tasks = tasks,
-            onProgress = { _, _, _ -> },
-            onComplete = { stats ->
-                runOnUiThread {
+        // Kill dengan delay antar app (biar smooth)
+        val handler = Handler(Looper.getMainLooper())
+        var index = 0
+        var successCount = 0
+
+        val runnable = object : Runnable {
+            override fun run() {
+                if (index >= apps.size) {
+                    // Selesai
                     isProcessing = false
-                    val intent = Intent(this, KillerActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    }
-                    startActivity(intent)
+                    updateButtonCount()
                     Toast.makeText(
-                        this,
-                        "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
+                        this@KillerActivity,
+                        "Selesai: $successCount dari ${apps.size}",
                         Toast.LENGTH_LONG
                     ).show()
-                    updateRamInfo()
+
+                    // Refresh daftar
                     loadRunningApps()
+                    return
                 }
+
+                val app = apps[index]
+                val success = AppRepository.killWithBackgroundProcesses(
+                    this@KillerActivity,
+                    app.packageName
+                )
+                if (success) successCount++
+
+                index++
+                handler.postDelayed(this, 100)  // 100ms antar app
             }
-        )
+        }
+
+        handler.post(runnable)
     }
 }
