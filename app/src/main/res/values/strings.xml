@@ -82,8 +82,8 @@
     <string name="killer_filter_system_apps">System apps</string>
     <string name="killer_select_all">Pilih Semua</string>
 
-    <string name="killer_close_apps_zero">HENTIKAN APLIKASI</string>
-    <string name="killer_close_apps_count">HENTIKAN APLIKASI (%1$d)</string>
+    <string name="killer_close_apps_zero">CLOSE APPS</string>
+    <string name="killer_close_apps_count">CLOSE APPS (%1$d)</string>
 
     <string name="killer_menu_exception">Daftar Pengecualian</string>
     <string name="killer_menu_app_info">Buka info aplikasi</string>
