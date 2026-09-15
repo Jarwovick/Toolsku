@@ -5,8 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
@@ -33,14 +31,7 @@ import kotlinx.coroutines.launch
 
 class KillerActivity : AppCompatActivity() {
 
-    companion object {
-        /**
-         * Interval auto-refresh (ms).
-         * Terlalu kecil = boros baterai.
-         * Terlalu besar = terasa lambat.
-         */
-        private const val AUTO_REFRESH_INTERVAL_MS = 2000L
-    }
+    enum class FilterType { USER_APPS, SYSTEM_APPS }
 
     private lateinit var adapter: KillerAdapter
     private lateinit var tvHeaderTitle: TextView
@@ -58,13 +49,7 @@ class KillerActivity : AppCompatActivity() {
 
     private var allSelected = true
     private var isProcessing = false
-    private var isLoading = false
-
-    private val refreshHandler = Handler(Looper.getMainLooper())
-    private var autoRefreshEnabled = false
-
-    // Cache daftar terakhir — biar tidak flicker
-    private var lastPackageSet: Set<String> = emptySet()
+    private var currentFilter = FilterType.USER_APPS
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,12 +86,13 @@ class KillerActivity : AppCompatActivity() {
         }
 
         btnRefresh.setOnClickListener {
-            loadRunningApps(forceRefresh = true)
+            loadApps()
         }
 
         btnSelectAll.setOnClickListener {
             allSelected = !allSelected
             adapter.selectAll(allSelected)
+            updateSelectAllIcon()
             updateButtonCount()
         }
 
@@ -123,91 +109,41 @@ class KillerActivity : AppCompatActivity() {
         }
 
         updateRamInfo()
-        loadRunningApps()
+        loadApps()
     }
 
     override fun onResume() {
         super.onResume()
         updateRamInfo()
-
-        // Mulai auto-refresh
-        startAutoRefresh()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        // Stop auto-refresh saat activity tidak di foreground
-        stopAutoRefresh()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        stopAutoRefresh()
-    }
-
-    // ==== AUTO REFRESH ====
-
-    private fun startAutoRefresh() {
-        if (autoRefreshEnabled) return
-        autoRefreshEnabled = true
-
-        val runnable = object : Runnable {
-            override fun run() {
-                if (autoRefreshEnabled && !isProcessing) {
-                    loadRunningApps()
-                }
-                if (autoRefreshEnabled) {
-                    refreshHandler.postDelayed(this, AUTO_REFRESH_INTERVAL_MS)
-                }
-            }
+        if (!isProcessing) {
+            loadApps()
         }
-        refreshHandler.post(runnable)
-    }
-
-    private fun stopAutoRefresh() {
-        autoRefreshEnabled = false
-        refreshHandler.removeCallbacksAndMessages(null)
     }
 
     // ==== DATA ====
 
-    /**
-     * Load daftar running apps.
-     *
-     * @param forceRefresh true kalau user klik tombol refresh manual.
-     */
-    private fun loadRunningApps(forceRefresh: Boolean = false) {
-        if (isLoading) return
-        isLoading = true
+    private fun loadApps() {
+        tvLoading.visibility = View.VISIBLE
+        tvLoading.text = getString(R.string.killer_loading)
 
         lifecycleScope.launch {
-            try {
-                val runningApps = AppRepository.getRunningApps(this@KillerActivity)
-                    .map { it.toKillerItem() }
+            val apps = when (currentFilter) {
+                FilterType.USER_APPS -> AppRepository.getRunningApps(this@KillerActivity)
+                FilterType.SYSTEM_APPS -> AppRepository.getSafeSystemApps(this@KillerActivity)
+            }.map { it.toKillerItem() }
 
-                val newPackageSet = runningApps.map { it.packageName }.toSet()
+            adapter.submitList(apps)
+            allSelected = apps.isNotEmpty()
+            updateSelectAllIcon()
+            updateButtonCount()
+            updateLaunchedAppsCount(apps.size)
+            updateRamInfo()
 
-                // Cek apakah daftar berubah
-                val hasChanged = newPackageSet != lastPackageSet || forceRefresh
-
-                if (hasChanged) {
-                    adapter.submitList(runningApps)
-                    allSelected = runningApps.isNotEmpty()
-                    updateSelectAllIcon()
-                    updateButtonCount()
-                    updateLaunchedAppsCount(runningApps.size)
-                    updateRamInfo()
-                    lastPackageSet = newPackageSet
-
-                    if (runningApps.isEmpty()) {
-                        tvLoading.visibility = View.VISIBLE
-                        tvLoading.text = getString(R.string.killer_no_apps)
-                    } else {
-                        tvLoading.visibility = View.GONE
-                    }
-                }
-            } finally {
-                isLoading = false
+            if (apps.isEmpty()) {
+                tvLoading.visibility = View.VISIBLE
+                tvLoading.text = getString(R.string.killer_no_apps)
+            } else {
+                tvLoading.visibility = View.GONE
             }
         }
     }
@@ -230,11 +166,14 @@ class KillerActivity : AppCompatActivity() {
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 0 -> {
+                    currentFilter = FilterType.USER_APPS
                     tvFilterLabel.text = getString(R.string.killer_filter_user_apps)
-                    loadRunningApps(forceRefresh = true)
+                    loadApps()
                 }
                 1 -> {
-                    Toast.makeText(this, "System apps — coming soon", Toast.LENGTH_SHORT).show()
+                    currentFilter = FilterType.SYSTEM_APPS
+                    tvFilterLabel.text = getString(R.string.killer_filter_system_apps)
+                    loadApps()
                 }
             }
             true
@@ -279,6 +218,10 @@ class KillerActivity : AppCompatActivity() {
     }
 
     private fun updateSelectAllIcon() {
+        btnSelectAll.setImageResource(
+            if (allSelected) R.drawable.ic_checkbox_checked
+            else R.drawable.ic_checkbox_unchecked
+        )
         btnSelectAll.imageTintList = android.content.res.ColorStateList.valueOf(
             if (allSelected) {
                 ContextCompat.getColor(this, R.color.accent)
@@ -333,13 +276,13 @@ class KillerActivity : AppCompatActivity() {
             Prefs.addException(item.packageName)
             Toast.makeText(this, "Ditambahkan ke pengecualian", Toast.LENGTH_SHORT).show()
         }
-        loadRunningApps(forceRefresh = true)
+        loadApps()
     }
 
     // ==== KILL ====
 
     private fun startKilling() {
-        val selected = adapter.getItems().filter { it.selected && !it.isSystem }
+        val selected = adapter.getItems().filter { it.selected }
         if (selected.isEmpty()) {
             Toast.makeText(this, "Tidak ada aplikasi dipilih", Toast.LENGTH_SHORT).show()
             return
@@ -351,15 +294,22 @@ class KillerActivity : AppCompatActivity() {
             return
         }
 
-        AlertDialog.Builder(this)
-            .setTitle("Hentikan ${selected.size} aplikasi?")
-            .setMessage("Aplikasi akan dihentikan paksa.")
-            .setPositiveButton("Hentikan") { _, _ -> executeKillOptimized(selected) }
-            .setNegativeButton("Batal", null)
-            .show()
+        // Kill langsung tanpa dialog (untuk system apps) atau dengan dialog (user apps)
+        if (currentFilter == FilterType.SYSTEM_APPS) {
+            // System apps: langsung kill tanpa dialog
+            executeKill(selected)
+        } else {
+            // User apps: dengan dialog konfirmasi
+            AlertDialog.Builder(this)
+                .setTitle("Hentikan ${selected.size} aplikasi?")
+                .setMessage("Aplikasi akan dihentikan paksa.")
+                .setPositiveButton("Hentikan") { _, _ -> executeKill(selected) }
+                .setNegativeButton("Batal", null)
+                .show()
+        }
     }
 
-    private fun executeKillOptimized(apps: List<KillerAppItem>) {
+    private fun executeKill(apps: List<KillerAppItem>) {
         isProcessing = true
         updateButtonCount()
 
@@ -385,7 +335,6 @@ class KillerActivity : AppCompatActivity() {
                     isProcessing = false
                     updateButtonCount()
 
-                    // Kembali ke Killer
                     val intent = Intent(this, KillerActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     }
@@ -396,10 +345,6 @@ class KillerActivity : AppCompatActivity() {
                         "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
                         Toast.LENGTH_LONG
                     ).show()
-
-                    // Force refresh setelah kill
-                    lastPackageSet = emptySet()
-                    loadRunningApps(forceRefresh = true)
                 }
             }
         )
