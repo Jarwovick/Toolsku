@@ -10,10 +10,6 @@ import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 
-/**
- * Eksekutor langkah otomasi.
- * Menjalankan ActionStep satu per satu.
- */
 class TaskExecutor(
     private val service: AccessibilityService,
     private val context: Context
@@ -21,18 +17,12 @@ class TaskExecutor(
 
     companion object {
         private const val TAG = "ToolskuExecutor"
-        private const val DEFAULT_TIMEOUT_MS = 2000L
     }
 
     private val handler = Handler(Looper.getMainLooper())
-    private var currentTask: TaskInfo? = null
     private var onFinish: ((TaskResult) -> Unit)? = null
 
-    /**
-     * Eksekusi satu Task.
-     */
     fun execute(task: TaskInfo, onFinish: (TaskResult) -> Unit) {
-        currentTask = task
         this.onFinish = onFinish
         Log.i(TAG, "Executing task: ${task.task.packageName}")
 
@@ -46,7 +36,6 @@ class TaskExecutor(
 
     private fun executeStep(task: TaskInfo, stepIndex: Int) {
         if (stepIndex >= task.task.steps.size) {
-            // Semua step selesai
             finish(TaskResult.Success)
             return
         }
@@ -58,7 +47,6 @@ class TaskExecutor(
         when (step) {
             is ActionStep.OpenAppInfo -> {
                 if (openAppInfo(step.packageName)) {
-                    // Tunggu window terbuka
                     delay(800) { executeStep(task, stepIndex + 1) }
                 } else {
                     finish(TaskResult.Error("Failed to open App Info"))
@@ -67,15 +55,15 @@ class TaskExecutor(
 
             is ActionStep.ClickByText -> {
                 if (clickByText(step.texts)) {
-                    delay(300) { executeStep(task, stepIndex + 1) }
+                    delay(400) { executeStep(task, stepIndex + 1) }
                 } else {
-                    finish(TaskResult.NodeNotFound(step, "Text not found: ${step.texts}"))
+                    finish(TaskResult.NodeNotFound(step, "Text not found"))
                 }
             }
 
             is ActionStep.ClickByTextSafe -> {
                 if (clickByTextSafe(step.texts, step.dangerTexts)) {
-                    delay(300) { executeStep(task, stepIndex + 1) }
+                    delay(400) { executeStep(task, stepIndex + 1) }
                 } else {
                     finish(TaskResult.NodeNotFound(step, "Safe text not found"))
                 }
@@ -99,8 +87,6 @@ class TaskExecutor(
             }
         }
     }
-
-    // ==== AKSI ====
 
     private fun openAppInfo(pkg: String): Boolean {
         return try {
@@ -134,19 +120,15 @@ class TaskExecutor(
     }
 
     private fun performClick(node: AccessibilityNodeInfo): Boolean {
-        // Coba click langsung
         if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
             return true
         }
-        // Cari parent clickable
         val parent = NodeFinder.findClickableParent(node)
         if (parent != null && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
             return true
         }
         return false
     }
-
-    // ==== UTIL ====
 
     private fun delay(millis: Long, action: () -> Unit) {
         handler.postDelayed(action, millis)
@@ -155,7 +137,6 @@ class TaskExecutor(
     private fun finish(result: TaskResult) {
         Log.i(TAG, "Task finish: $result")
         onFinish?.invoke(result)
-        currentTask = null
         onFinish = null
     }
 
