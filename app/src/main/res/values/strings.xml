@@ -50,7 +50,6 @@
     <string name="dimmer_brightness">Kecerahan</string>
     <string name="dimmer_hint">Atur tingkat peredupan 0%–100%</string>
 
-    <!-- Dimmer additions -->
     <string name="dimmer_allow">Memungkinkan</string>
     <string name="dimmer_on">ON</string>
     <string name="dimmer_off">OFF</string>
@@ -67,7 +66,7 @@
     <string name="killer_close_apps">Hentikan Aplikasi (%1$d)</string>
     <string name="killer_exception_list">Daftar Pengecualian</string>
 
-    <!-- Killer test -->
+    <!-- Killer test (Fase 3B — dipertahankan untuk fallback) -->
     <string name="killer_test_mode">🧪 TEST MODE</string>
     <string name="killer_test_title">Kill WhatsApp</string>
     <string name="killer_test_desc">Tombol ini akan membuka App Info WhatsApp, klik Paksa berhenti, dan konfirmasi.</string>
@@ -78,6 +77,35 @@
     <string name="killer_test_done">Selesai: %1$d sukses, %2$d gagal</string>
     <string name="killer_test_no_accessibility">Aktifkan Aksesibilitas dulu</string>
     <string name="killer_test_queue_busy">Gagal: queue sedang berjalan</string>
+
+    <!-- Killer header (Fase 4A) -->
+    <string name="killer_header_title">TOOLSKU</string>
+    <string name="killer_menu_desc">Menu</string>
+    <string name="killer_app_menu_desc">Menu aplikasi</string>
+
+    <!-- RAM monitor (Fase 4A) -->
+    <string name="killer_used_memory">USED MEMORY</string>
+    <string name="killer_available_memory">Available memory</string>
+    <string name="killer_launched_apps">Launched apps</string>
+
+    <!-- Filter (Fase 4A) -->
+    <string name="killer_filter_user_apps">User apps</string>
+    <string name="killer_filter_system_apps">System apps</string>
+
+    <!-- Close apps button (Fase 4A) -->
+    <string name="killer_close_apps_zero">HENTIKAN APLIKASI</string>
+    <string name="killer_close_apps_count">HENTIKAN APLIKASI (%1$d)</string>
+
+    <!-- Killer menu (Fase 4A) -->
+    <string name="killer_menu_exception">Daftar Pengecualian</string>
+    <string name="killer_menu_app_info">Buka info aplikasi</string>
+    <string name="killer_menu_add_exception">Tambah ke pengecualian</string>
+    <string name="killer_menu_remove_exception">Hapus dari pengecualian</string>
+
+    <!-- Overlay (Fase 4A) -->
+    <string name="overlay_closing_title">MENUTUP APLIKASI</string>
+    <string name="overlay_closing_subtitle">SHUTTING DOWN</string>
+    <string name="overlay_closing_percent">%1$d PERCENT</string>
 
     <!-- Cleaner -->
     <string name="cleaner_title">Bersihkan Cache</string>
@@ -91,7 +119,7 @@
     <string name="boot_hint">Keduanya membuka menu power bawaan. Anda tetap perlu memilih opsi di menu tersebut.</string>
     <string name="boot_not_supported">Fitur ini membutuhkan Android 12 atau lebih baru</string>
 
-    <!-- Overlay -->
+    <!-- Overlay general -->
     <string name="overlay_cleaning">MEMBERSIHKAN…</string>
     <string name="overlay_shutting">MENGHENTIKAN…</string>
     <string name="overlay_stop">Hentikan</string>
