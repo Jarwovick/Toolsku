@@ -19,14 +19,15 @@
         app:layout_constraintTop_toTopOf="parent">
 
         <TextView
+            android:id="@+id/tvHeaderTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/killer_header_title"
+            android:text="@string/header_kill_apps_running"
             android:textColor="@color/accent"
-            android:textSize="28sp"
+            android:textSize="26sp"
             android:textStyle="bold"
-            android:letterSpacing="0.05" />
+            android:letterSpacing="0.02" />
 
         <ImageButton
             android:id="@+id/btnMenu"
@@ -51,7 +52,6 @@
         android:gravity="center_vertical"
         app:layout_constraintTop_toBottomOf="@id/headerBar">
 
-        <!-- Circular RAM -->
         <FrameLayout
             android:layout_width="100dp"
             android:layout_height="100dp">
@@ -75,7 +75,7 @@
                     android:id="@+id/tvRamPercent"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="55%"
+                    android:text="0%"
                     android:textColor="@color/text_primary"
                     android:textSize="20sp"
                     android:textStyle="bold" />
@@ -90,7 +90,6 @@
             </LinearLayout>
         </FrameLayout>
 
-        <!-- RAM Stats -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -116,7 +115,7 @@
                     android:id="@+id/tvRamUsedText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="8.87 GB / 15.87 GB"
+                    android:text="0 / 0"
                     android:textColor="@color/text_secondary"
                     android:textSize="11sp" />
             </LinearLayout>
@@ -128,7 +127,7 @@
                 android:layout_height="8dp"
                 android:layout_marginTop="8dp"
                 android:max="100"
-                android:progress="55"
+                android:progress="0"
                 android:progressTint="@color/accent"
                 android:progressBackgroundTint="@color/divider" />
 
@@ -148,7 +147,7 @@
                         android:id="@+id/tvRamAvailable"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="7.00 GB"
+                        android:text="0"
                         android:textColor="@color/success"
                         android:textSize="16sp"
                         android:textStyle="bold" />
@@ -172,7 +171,7 @@
                         android:id="@+id/tvLaunchedApps"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="20"
+                        android:text="0"
                         android:textColor="@color/success"
                         android:textSize="16sp"
                         android:textStyle="bold" />
