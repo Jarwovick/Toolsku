@@ -76,6 +76,7 @@
     <string name="killer_used_memory">USED MEMORY</string>
     <string name="killer_available_memory">Available memory</string>
     <string name="killer_launched_apps">Launched apps</string>
+    <string name="killer_refresh">Refresh</string>
 
     <string name="killer_filter_user_apps">User apps</string>
     <string name="killer_filter_system_apps">System apps</string>
