@@ -34,6 +34,11 @@ import kotlinx.coroutines.launch
 class KillerActivity : AppCompatActivity() {
 
     companion object {
+        /**
+         * Interval auto-refresh (ms).
+         * Terlalu kecil = boros baterai.
+         * Terlalu besar = terasa lambat.
+         */
         private const val AUTO_REFRESH_INTERVAL_MS = 2000L
     }
 
@@ -57,6 +62,8 @@ class KillerActivity : AppCompatActivity() {
 
     private val refreshHandler = Handler(Looper.getMainLooper())
     private var autoRefreshEnabled = false
+
+    // Cache daftar terakhir — biar tidak flicker
     private var lastPackageSet: Set<String> = emptySet()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -122,12 +129,14 @@ class KillerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateRamInfo()
-        loadRunningApps(forceRefresh = true)
+
+        // Mulai auto-refresh
         startAutoRefresh()
     }
 
     override fun onPause() {
         super.onPause()
+        // Stop auto-refresh saat activity tidak di foreground
         stopAutoRefresh()
     }
 
@@ -144,7 +153,7 @@ class KillerActivity : AppCompatActivity() {
 
         val runnable = object : Runnable {
             override fun run() {
-                if (autoRefreshEnabled && !isProcessing && !isLoading) {
+                if (autoRefreshEnabled && !isProcessing) {
                     loadRunningApps()
                 }
                 if (autoRefreshEnabled) {
@@ -162,6 +171,11 @@ class KillerActivity : AppCompatActivity() {
 
     // ==== DATA ====
 
+    /**
+     * Load daftar running apps.
+     *
+     * @param forceRefresh true kalau user klik tombol refresh manual.
+     */
     private fun loadRunningApps(forceRefresh: Boolean = false) {
         if (isLoading) return
         isLoading = true
@@ -172,6 +186,8 @@ class KillerActivity : AppCompatActivity() {
                     .map { it.toKillerItem() }
 
                 val newPackageSet = runningApps.map { it.packageName }.toSet()
+
+                // Cek apakah daftar berubah
                 val hasChanged = newPackageSet != lastPackageSet || forceRefresh
 
                 if (hasChanged) {
@@ -381,11 +397,9 @@ class KillerActivity : AppCompatActivity() {
                         Toast.LENGTH_LONG
                     ).show()
 
-                    // Delay 1.5 detik supaya Android update running apps
-                    refreshHandler.postDelayed({
-                        lastPackageSet = emptySet()
-                        loadRunningApps(forceRefresh = true)
-                    }, 1500)
+                    // Force refresh setelah kill
+                    lastPackageSet = emptySet()
+                    loadRunningApps(forceRefresh = true)
                 }
             }
         )
