@@ -18,6 +18,9 @@
     <!-- Izin untuk mematikan background process (fallback) -->
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
 
+    <!-- Izin untuk mendapat daftar running apps (legacy, tapi masih berguna) -->
+    <uses-permission android:name="android.permission.GET_TASKS" />
+
     <!-- Izin untuk mengunci rotasi saat otomasi -->
     <uses-permission
         android:name="android.permission.WRITE_SETTINGS"
