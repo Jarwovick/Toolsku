@@ -3,7 +3,7 @@
     <string name="app_name">Toolsku</string>
     <string name="app_tagline">Android Toolbox</string>
 
-    <!-- Header titles per halaman (English) -->
+    <!-- Header titles -->
     <string name="header_home">Toolsku</string>
     <string name="header_dimmer">Screen Dimmer</string>
     <string name="header_kill_apps_running">Kill Apps Running</string>
@@ -69,11 +69,6 @@
 
     <!-- Killer -->
     <string name="killer_title">Hentikan Aplikasi</string>
-    <string name="killer_select_all">Pilih Semua</string>
-    <string name="killer_deselect_all">Batal Pilih</string>
-    <string name="killer_close_apps">Hentikan Aplikasi (%1$d)</string>
-    <string name="killer_exception_list">Daftar Pengecualian</string>
-
     <string name="killer_header_title">TOOLSKU</string>
     <string name="killer_menu_desc">Menu</string>
     <string name="killer_app_menu_desc">Menu aplikasi</string>
@@ -84,6 +79,7 @@
 
     <string name="killer_filter_user_apps">User apps</string>
     <string name="killer_filter_system_apps">System apps</string>
+    <string name="killer_select_all">Pilih Semua</string>
 
     <string name="killer_close_apps_zero">HENTIKAN APLIKASI</string>
     <string name="killer_close_apps_count">HENTIKAN APLIKASI (%1$d)</string>
@@ -97,29 +93,29 @@
     <string name="overlay_closing_subtitle">SHUTTING DOWN</string>
     <string name="overlay_closing_percent">%1$d PERCENT</string>
 
-    <!-- Killer test (fallback dari Fase 3B) -->
-    <string name="killer_test_mode">🧪 TEST MODE</string>
-    <string name="killer_test_title">Kill WhatsApp</string>
-    <string name="killer_test_desc">Tombol ini akan membuka App Info WhatsApp, klik Paksa berhenti, dan konfirmasi.</string>
-    <string name="killer_test_button">🚀 JALANKAN TEST</string>
-    <string name="killer_test_ready">Siap</string>
-    <string name="killer_test_running">Menjalankan otomasi…</string>
-    <string name="killer_test_progress">Progress: %1$d/%2$d — %3$s</string>
-    <string name="killer_test_done">Selesai: %1$d sukses, %2$d gagal</string>
+    <!-- Killer test (fallback) -->
     <string name="killer_test_no_accessibility">Aktifkan Aksesibilitas dulu</string>
-    <string name="killer_test_queue_busy">Gagal: queue sedang berjalan</string>
+
+    <!-- Loading -->
+    <string name="killer_loading">Memuat aplikasi…</string>
+    <string name="killer_no_apps">Tidak ada aplikasi berjalan</string>
 
     <!-- Cleaner -->
     <string name="cleaner_title">Bersihkan Cache</string>
     <string name="cleaner_clear_all">Bersihkan Semua (%1$d)</string>
     <string name="cleaner_cache_label">Cache</string>
 
-    <!-- Boot -->
+    <!-- Boot Menu -->
     <string name="boot_title">Menu Boot</string>
     <string name="boot_restart">Hidupkan Ulang</string>
     <string name="boot_shutdown">Matikan</string>
+    <string name="boot_restart_desc">Buka menu power untuk memilih restart</string>
+    <string name="boot_shutdown_desc">Buka menu power untuk memilih matikan</string>
     <string name="boot_hint">Keduanya membuka menu power bawaan. Anda tetap perlu memilih opsi di menu tersebut.</string>
     <string name="boot_not_supported">Fitur ini membutuhkan Android 12 atau lebih baru</string>
+    <string name="boot_no_accessibility">Aktifkan Aksesibilitas dulu</string>
+    <string name="boot_success">Menu power dibuka</string>
+    <string name="boot_failed">Gagal membuka menu power</string>
 
     <!-- Overlay general -->
     <string name="overlay_cleaning">MEMBERSIHKAN…</string>
