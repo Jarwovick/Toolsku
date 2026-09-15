@@ -3,6 +3,14 @@
     <string name="app_name">Toolsku</string>
     <string name="app_tagline">Android Toolbox</string>
 
+    <!-- Header titles per halaman (English) -->
+    <string name="header_home">Toolsku</string>
+    <string name="header_dimmer">Screen Dimmer</string>
+    <string name="header_kill_apps_running">Kill Apps Running</string>
+    <string name="header_clear_cache">Clear Cache</string>
+    <string name="header_boot_menu">Boot Menu</string>
+    <string name="header_exception_list">Exception List</string>
+
     <string name="home_title">Toolsku</string>
     <string name="home_subtitle">Choose a feature</string>
 
@@ -60,17 +68,6 @@
     <string name="killer_deselect_all">Deselect All</string>
     <string name="killer_close_apps">Close Apps (%1$d)</string>
     <string name="killer_exception_list">Exception List</string>
-
-    <string name="killer_test_mode">🧪 TEST MODE</string>
-    <string name="killer_test_title">Kill WhatsApp</string>
-    <string name="killer_test_desc">This button will open WhatsApp App Info, tap Force stop, and confirm.</string>
-    <string name="killer_test_button">🚀 RUN TEST</string>
-    <string name="killer_test_ready">Ready</string>
-    <string name="killer_test_running">Running automation…</string>
-    <string name="killer_test_progress">Progress: %1$d/%2$d — %3$s</string>
-    <string name="killer_test_done">Done: %1$d success, %2$d failed</string>
-    <string name="killer_test_no_accessibility">Enable Accessibility first</string>
-    <string name="killer_test_queue_busy">Failed: queue is running</string>
 
     <string name="killer_header_title">TOOLSKU</string>
     <string name="killer_menu_desc">Menu</string>
