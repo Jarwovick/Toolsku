@@ -5,8 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
@@ -22,6 +20,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.toolsku.app.R
+import com.toolsku.app.automation.ActionStep
+import com.toolsku.app.automation.AutomationAccessibilityService
+import com.toolsku.app.automation.AutomationTask
+import com.toolsku.app.automation.OemProfile
 import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.Prefs
@@ -109,6 +111,9 @@ class KillerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateRamInfo()
+        if (!isProcessing) {
+            loadRunningApps()
+        }
     }
 
     // ==== DATA ====
@@ -270,54 +275,67 @@ class KillerActivity : AppCompatActivity() {
             return
         }
 
+        val service = AutomationAccessibilityService.instance
+        if (service == null) {
+            Toast.makeText(this, R.string.killer_test_no_accessibility, Toast.LENGTH_LONG).show()
+            return
+        }
+
         AlertDialog.Builder(this)
             .setTitle("Hentikan ${selected.size} aplikasi?")
             .setMessage("Aplikasi akan dihentikan paksa.")
-            .setPositiveButton("Hentikan") { _, _ -> executeKill(selected) }
+            .setPositiveButton("Hentikan") { _, _ -> executeKillOptimized(selected) }
             .setNegativeButton("Batal", null)
             .show()
     }
 
-    private fun executeKill(apps: List<KillerAppItem>) {
+    /**
+     * Kill via Accessibility Service dengan timing OPTIMAL.
+     * Total ~1 detik per app.
+     */
+    private fun executeKillOptimized(apps: List<KillerAppItem>) {
         isProcessing = true
         updateButtonCount()
 
-        Toast.makeText(this, "Memproses ${apps.size} aplikasi…", Toast.LENGTH_SHORT).show()
-
-        // Kill dengan delay antar app (biar smooth)
-        val handler = Handler(Looper.getMainLooper())
-        var index = 0
-        var successCount = 0
-
-        val runnable = object : Runnable {
-            override fun run() {
-                if (index >= apps.size) {
-                    // Selesai
-                    isProcessing = false
-                    updateButtonCount()
-                    Toast.makeText(
-                        this@KillerActivity,
-                        "Selesai: $successCount dari ${apps.size}",
-                        Toast.LENGTH_LONG
-                    ).show()
-
-                    // Refresh daftar
-                    loadRunningApps()
-                    return
-                }
-
-                val app = apps[index]
-                val success = AppRepository.killWithBackgroundProcesses(
-                    this@KillerActivity,
-                    app.packageName
-                )
-                if (success) successCount++
-
-                index++
-                handler.postDelayed(this, 100)  // 100ms antar app
-            }
+        val tasks = apps.map { app ->
+            val steps = mutableListOf<ActionStep>()
+            // Buka App Info
+            steps.add(ActionStep.OpenAppInfo(app.packageName))
+            steps.add(ActionStep.Wait(300))
+            // Klik "Paksa berhenti"
+            steps.add(ActionStep.ClickByText(OemProfile.forceStopButtonLabels))
+            steps.add(ActionStep.Wait(200))
+            // Klik konfirmasi
+            steps.add(ActionStep.ClickByText(OemProfile.forceStopConfirmLabels))
+            steps.add(ActionStep.Wait(200))
+            // Back (hanya 1x, karena App Info adalah activity teratas)
+            steps.add(ActionStep.Back)
+            steps.add(ActionStep.Wait(150))
+            AutomationTask(app.packageName, steps)
         }
 
-        handler.post(runnable)
+        val service = AutomationAccessibilityService.instance ?: return
+        service.runQueue(
+            tasks = tasks,
+            onProgress = { _, _, _ -> },
+            onComplete = { stats ->
+                runOnUiThread {
+                    isProcessing = false
+                    updateButtonCount()
+
+                    // Kembali ke Killer
+                    val intent = Intent(this, KillerActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    }
+                    startActivity(intent)
+
+                    Toast.makeText(
+                        this,
+                        "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        )
     }
 }
