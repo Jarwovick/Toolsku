@@ -92,6 +92,18 @@
     <string name="overlay_closing_subtitle">SHUTTING DOWN</string>
     <string name="overlay_closing_percent">%1$d PERCENT</string>
 
+    <!-- Killer test (fallback) -->
+    <string name="killer_test_mode">🧪 TEST MODE</string>
+    <string name="killer_test_title">Kill WhatsApp</string>
+    <string name="killer_test_desc">This button will open WhatsApp App Info, tap Force stop, and confirm.</string>
+    <string name="killer_test_button">🚀 RUN TEST</string>
+    <string name="killer_test_ready">Ready</string>
+    <string name="killer_test_running">Running automation…</string>
+    <string name="killer_test_progress">Progress: %1$d/%2$d — %3$s</string>
+    <string name="killer_test_done">Done: %1$d success, %2$d failed</string>
+    <string name="killer_test_no_accessibility">Enable Accessibility first</string>
+    <string name="killer_test_queue_busy">Failed: queue is running</string>
+
     <string name="cleaner_title">Clear Cache</string>
     <string name="cleaner_clear_all">Clear All (%1$d)</string>
     <string name="cleaner_cache_label">Cache</string>
