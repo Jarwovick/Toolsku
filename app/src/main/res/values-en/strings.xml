@@ -102,7 +102,7 @@
     <!-- Exception List -->
     <string name="exception_title">Exception List</string>
     <string name="exception_header">Exception List</string>
-    <string name="exception_desc">Apps in this list won't be force stopped</string>
+    <string name="exception_desc">Apps in this list will not be force stopped</string>
     <string name="exception_empty">No apps in exception list</string>
     <string name="exception_add">Add to exception</string>
     <string name="exception_remove">Remove from exception</string>
