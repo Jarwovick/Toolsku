@@ -110,8 +110,10 @@ class KillerActivity : AppCompatActivity() {
         tvLoading.text = getString(R.string.killer_loading)
 
         lifecycleScope.launch {
-            val runningApps = AppRepository.getRunningApps(this@KillerActivity)
-                .map { it.toKillerItem() }
+            val runningApps = AppRepository.getRunningApps(
+                this@KillerActivity,
+                fallbackToAllApps = true
+            ).map { it.toKillerItem() }
 
             adapter.submitList(runningApps)
             allSelected = runningApps.isNotEmpty()
@@ -120,9 +122,11 @@ class KillerActivity : AppCompatActivity() {
             updateLaunchedAppsCount(runningApps.size)
             updateRamInfo()
 
-            tvLoading.visibility = if (runningApps.isEmpty()) View.VISIBLE else View.GONE
             if (runningApps.isEmpty()) {
+                tvLoading.visibility = View.VISIBLE
                 tvLoading.text = getString(R.string.killer_no_apps)
+            } else {
+                tvLoading.visibility = View.GONE
             }
         }
     }
