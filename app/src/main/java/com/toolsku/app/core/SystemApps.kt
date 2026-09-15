@@ -1,14 +1,19 @@
 package com.toolsku.app.core
 
 /**
- * Daftar aplikasi sistem yang TIDAK boleh disentuh sama sekali
- * (tidak di-force-stop, tidak di-clear-cache).
+ * Kategorisasi aplikasi sistem.
  *
- * Daftar ini hardcoded dan tidak bisa diubah user.
+ * - DANGEROUS: tidak boleh di-kill sama sekali (bisa merusak sistem)
+ * - SAFE: boleh di-kill (galeri, kamera, browser, dll)
  */
 object SystemApps {
 
-    private val SYSTEM_PACKAGES = setOf(
+    /**
+     * System apps yang TIDAK BOLEH di-kill.
+     * Bisa menyebabkan sistem crash, tidak stabil, atau tidak bisa dipakai.
+     */
+    private val DANGEROUS_PACKAGES = setOf(
+        // System UI & Settings
         "com.android.systemui",
         "com.android.settings",
         "com.android.shell",
@@ -18,19 +23,36 @@ object SystemApps {
         "com.android.providers.telephony",
         "com.android.providers.calendar",
         "com.android.providers.downloads",
+        "com.android.providers.userdictionary",
+        "com.android.providers.blockednumber",
+
+        // Telephony & Phone
         "com.android.server.telecom",
         "com.android.dialer",
         "com.android.phone",
-        "com.android.deskclock",
+        "com.android.mms",
+        "com.android.messaging",
+
+        // System Services
         "com.android.bluetooth",
         "com.android.nfc",
+        "com.android.se",
+        "com.android.keychain",
+
+        // Google Services (penting)
         "com.google.android.gms",
         "com.google.android.gsf",
+        "com.google.android.gsf.login",
+
+        // App kita
         "com.toolsku.app",
         "com.toolsku.app.debug"
     )
 
-    private val SYSTEM_PREFIXES = listOf(
+    /**
+     * Prefix package yang TIDAK BOLEH di-kill.
+     */
+    private val DANGEROUS_PREFIXES = listOf(
         "com.android.launcher",
         "com.coloros.launcher",
         "com.oppo.launcher",
@@ -39,20 +61,107 @@ object SystemApps {
         "com.baidu.input",
         "com.sohu.inputmethod",
         "com.coloros.alarmclock",
-        "com.android.internal"
+        "com.android.internal",
+        "com.android.server"
     )
 
     /**
-     * Cek apakah package termasuk aplikasi sistem.
+     * System apps yang AMAN di-kill.
+     * Biasanya app bawaan OEM (galeri, kamera, browser, dll).
+     */
+    private val SAFE_SYSTEM_PACKAGES = setOf(
+        // Galeri
+        "com.coloros.gallery3d",
+        "com.oppo.gallery3d",
+        "com.android.gallery3d",
+        "com.realme.gallery3d",
+
+        // Kamera
+        "com.oppo.camera",
+        "com.coloros.camera",
+        "com.android.camera",
+        "com.android.camera2",
+
+        // Browser bawaan
+        "com.heytap.browser",
+        "com.coloros.browser",
+        "com.android.browser",
+
+        // Music & Video
+        "com.oppo.music",
+        "com.heytap.music",
+        "com.coloros.music",
+        "com.coloros.video",
+        "com.oppo.video",
+
+        // Tools
+        "com.coloros.calculator",
+        "com.coloros.weather",
+        "com.coloros.note",
+        "com.coloros.feedback",
+        "com.coloros.cloud",
+        "com.coloros.oshare",
+        "com.coloros.safecenter",
+
+        // File Manager
+        "com.coloros.filemanager",
+        "com.oppo.filemanager",
+
+        // Calendar
+        "com.coloros.calendar",
+        "com.android.calendar",
+
+        // Email
+        "com.android.email",
+        "com.coloros.email"
+    )
+
+    /**
+     * Prefix package yang AMAN di-kill.
+     */
+    private val SAFE_SYSTEM_PREFIXES = listOf(
+        "com.coloros.gallery",
+        "com.oppo.gallery",
+        "com.coloros.camera",
+        "com.oppo.camera",
+        "com.coloros.video",
+        "com.coloros.music",
+        "com.coloros.calculator",
+        "com.coloros.weather",
+        "com.coloros.note",
+        "com.coloros.filemanager"
+    )
+
+    /**
+     * Cek apakah package adalah system app (bawaan ROM).
      */
     fun isSystemApp(pkg: String): Boolean {
-        if (SYSTEM_PACKAGES.contains(pkg)) return true
-        return SYSTEM_PREFIXES.any { pkg.startsWith(it) }
+        return pkg.startsWith("com.android.") ||
+               pkg.startsWith("com.coloros.") ||
+               pkg.startsWith("com.oppo.") ||
+               pkg.startsWith("com.realme.") ||
+               pkg.startsWith("com.heytap.") ||
+               pkg.startsWith("com.google.android.")
     }
 
     /**
-     * Cek apakah package termasuk keyboard yang aktif.
-     * (versi lebih sederhana: cek prefix inputmethod)
+     * Cek apakah package adalah system app yang TIDAK BOLEH di-kill.
+     */
+    fun isDangerousSystemApp(pkg: String): Boolean {
+        if (DANGEROUS_PACKAGES.contains(pkg)) return true
+        return DANGEROUS_PREFIXES.any { pkg.startsWith(it) }
+    }
+
+    /**
+     * Cek apakah package adalah system app yang AMAN di-kill.
+     */
+    fun isSafeSystemApp(pkg: String): Boolean {
+        if (SAFE_SYSTEM_PACKAGES.contains(pkg)) return true
+        return SAFE_SYSTEM_PREFIXES.any { pkg.startsWith(it) }
+    }
+
+    /**
+     * Cek apakah package adalah keyboard.
      */
     fun isKeyboard(pkg: String): Boolean {
         return pkg.contains("inputmethod") || pkg.contains(".input")
