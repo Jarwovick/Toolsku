@@ -76,7 +76,6 @@
     <string name="killer_used_memory">USED MEMORY</string>
     <string name="killer_available_memory">Available memory</string>
     <string name="killer_launched_apps">Launched apps</string>
-    <string name="killer_refresh">Refresh</string>
 
     <string name="killer_filter_user_apps">User apps</string>
     <string name="killer_filter_system_apps">System apps</string>
@@ -100,11 +99,26 @@
     <!-- Loading -->
     <string name="killer_loading">Memuat aplikasi…</string>
     <string name="killer_no_apps">Tidak ada aplikasi berjalan</string>
+    <string name="killer_refresh">Refresh</string>
+
+    <!-- Exception List -->
+    <string name="exception_title">Daftar Pengecualian</string>
+    <string name="exception_header">Exception List</string>
+    <string name="exception_desc">Aplikasi di daftar ini tidak akan dihentikan paksa</string>
+    <string name="exception_empty">Belum ada aplikasi di daftar pengecualian</string>
+    <string name="exception_add">Tambah ke pengecualian</string>
+    <string name="exception_remove">Hapus dari pengecualian</string>
+    <string name="exception_added">Ditambahkan ke pengecualian</string>
+    <string name="exception_removed">Dihapus dari pengecualian</string>
 
     <!-- Cleaner -->
     <string name="cleaner_title">Bersihkan Cache</string>
+    <string name="cleaner_header">Clear Cache</string>
     <string name="cleaner_clear_all">Bersihkan Semua (%1$d)</string>
     <string name="cleaner_cache_label">Cache</string>
+    <string name="cleaner_total_cache">Total Cache</string>
+    <string name="cleaner_loading">Memuat aplikasi…</string>
+    <string name="cleaner_no_apps">Tidak ada aplikasi</string>
 
     <!-- Boot Menu -->
     <string name="boot_title">Menu Boot</string>
