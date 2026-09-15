@@ -232,4 +232,88 @@ class KillerActivity : AppCompatActivity() {
     private fun showMainMenu(anchor: android.view.View) {
         val popup = PopupMenu(this, anchor)
         popup.menu.add(0, 0, 0, getString(R.string.killer_menu_exception))
-        popup
+        popup.setOnMenuItemClickListener {
+            startActivity(Intent(this, ExceptionActivity::class.java))
+            true
+        }
+        popup.show()
+    }
+
+    private fun openAppInfo(pkg: String) {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:$pkg")
+        }
+        startActivity(intent)
+    }
+
+    private fun toggleException(item: KillerAppItem) {
+        if (Prefs.isException(item.packageName)) {
+            Prefs.removeException(item.packageName)
+            Toast.makeText(this, "Dihapus dari pengecualian", Toast.LENGTH_SHORT).show()
+        } else {
+            Prefs.addException(item.packageName)
+            Toast.makeText(this, "Ditambahkan ke pengecualian", Toast.LENGTH_SHORT).show()
+        }
+        // Refresh
+        loadApps()
+    }
+
+    // ==== KILL ====
+
+    private fun startKilling() {
+        val selected = adapter.getItems().filter { it.selected && !it.isSystem }
+        if (selected.isEmpty()) {
+            Toast.makeText(this, "Tidak ada aplikasi dipilih", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val service = AutomationAccessibilityService.instance
+        if (service == null) {
+            Toast.makeText(this, R.string.killer_test_no_accessibility, Toast.LENGTH_LONG).show()
+            return
+        }
+
+        // Konfirmasi
+        AlertDialog.Builder(this)
+            .setTitle("Hentikan ${selected.size} aplikasi?")
+            .setMessage("Aplikasi akan dihentikan paksa.")
+            .setPositiveButton("Hentikan") { _, _ ->
+                executeKill(selected)
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    private fun executeKill(apps: List<KillerAppItem>) {
+        val tasks = apps.map { app ->
+            val steps = mutableListOf<ActionStep>()
+            steps.add(ActionStep.OpenAppInfo(app.packageName))
+            steps.add(ActionStep.Wait(800))
+            // Kalau app di exception → skip force stop, langsung clear cache
+            if (!Prefs.isException(app.packageName)) {
+                steps.add(ActionStep.ClickByText(OemProfile.forceStopButtonLabels))
+                steps.add(ActionStep.Wait(500))
+                steps.add(ActionStep.ClickByText(OemProfile.forceStopConfirmLabels))
+                steps.add(ActionStep.Wait(500))
+            }
+            steps.add(ActionStep.Back)
+            AutomationTask(app.packageName, steps)
+        }
+
+        val service = AutomationAccessibilityService.instance ?: return
+        service.runQueue(
+            tasks = tasks,
+            onProgress = { _, _, pkg -> runOnUiThread {
+                Toast.makeText(this, "Processing: $pkg", Toast.LENGTH_SHORT).show()
+            }},
+            onComplete = { stats -> runOnUiThread {
+                Toast.makeText(
+                    this,
+                    "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
+                    Toast.LENGTH_LONG
+                ).show()
+                loadApps()
+            }}
+        )
+    }
+}
