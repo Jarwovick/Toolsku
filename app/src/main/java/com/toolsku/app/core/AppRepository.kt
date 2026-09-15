@@ -48,48 +48,37 @@ object AppRepository {
     /**
      * Ambil daftar app yang BENAR-BENAR RUNNING.
      *
-     * Pakai:
-     * 1. getRunningAppProcesses() — utama
-     * 2. getRunningServices() — tambahan
-     *
-     * TIDAK pakai UsageStatsManager (Baxa tidak pakai).
+     * HANYA pakai ActivityManager.getRunningAppProcesses().
+     * Tidak pakai UsageStatsManager, tidak pakai getRunningServices.
      */
     suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val ourPackage = context.packageName
-        val runningPackages = mutableSetOf<String>()
+        val result = mutableListOf<AppInfo>()
+        val seen = mutableSetOf<String>()
 
-        // ===== Metode 1: getRunningAppProcesses =====
-        try {
+        val runningProcesses = try {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val processes = am.runningAppProcesses
-            if (processes != null) {
-                for (process in processes) {
-                    if (process.pkgList == null) continue
-                    val pkg = process.pkgList.firstOrNull() ?: process.processName ?: continue
-                    runningPackages.add(pkg)
-                }
-            }
+            am.runningAppProcesses
         } catch (e: Exception) {
             Log.e(TAG, "getRunningAppProcesses failed", e)
+            null
         }
 
-        // ===== Metode 2: getRunningServices =====
-        try {
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            @Suppress("DEPRECATION")
-            val services = am.getRunningServices(100)
-            for (service in services) {
-                runningPackages.add(service.service.packageName)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "getRunningServices failed", e)
+        if (runningProcesses == null) {
+            Log.w(TAG, "runningAppProcesses is null")
+            return@withContext emptyList()
         }
 
-        // ===== Filter hasil =====
-        val result = mutableListOf<AppInfo>()
-        for (pkg in runningPackages) {
+        Log.d(TAG, "runningAppProcesses.size = ${runningProcesses.size}")
+
+        for (process in runningProcesses) {
+            if (process.pkgList == null) continue
+
+            val pkg = process.pkgList.firstOrNull() ?: process.processName ?: continue
+
             if (pkg == ourPackage) continue
+            if (seen.contains(pkg)) continue
             if (SystemApps.isSystemApp(pkg)) continue
             if (Prefs.isException(pkg)) continue
 
@@ -98,6 +87,7 @@ object AppRepository {
                 val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                 if (isSystem) continue
 
+                seen.add(pkg)
                 result.add(
                     AppInfo(
                         packageName = pkg,
@@ -108,7 +98,7 @@ object AppRepository {
                     )
                 )
             } catch (e: Exception) {
-                // App sudah tidak terinstall
+                Log.w(TAG, "Cannot get info for $pkg", e)
             }
         }
 
@@ -119,14 +109,11 @@ object AppRepository {
 
     /**
      * Cek apakah package tertentu sedang running.
-     * Dipakai untuk verifikasi setelah kill.
      */
     suspend fun isPackageRunning(context: Context, packageName: String): Boolean =
         withContext(Dispatchers.IO) {
             try {
                 val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-
-                // Cek via processes
                 val processes = am.runningAppProcesses
                 if (processes != null) {
                     for (process in processes) {
@@ -134,14 +121,6 @@ object AppRepository {
                         if (process.processName == packageName) return@withContext true
                     }
                 }
-
-                // Cek via services
-                @Suppress("DEPRECATION")
-                val services = am.getRunningServices(100)
-                for (service in services) {
-                    if (service.service.packageName == packageName) return@withContext true
-                }
-
                 false
             } catch (e: Exception) {
                 false
