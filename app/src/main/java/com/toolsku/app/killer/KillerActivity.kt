@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
@@ -47,6 +49,7 @@ class KillerActivity : AppCompatActivity() {
 
     private var allSelected = true
     private var isProcessing = false
+    private var refreshHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -108,12 +111,41 @@ class KillerActivity : AppCompatActivity() {
         loadRunningApps()
     }
 
+    /**
+     * Dipanggil saat Activity sudah ada di backstack dan di-start ulang.
+     * Ini yang handle refresh setelah kill selesai.
+     */
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // Refresh daftar
+        isProcessing = false
+        updateButtonCount()
+        loadRunningApps()
+    }
+
     override fun onResume() {
         super.onResume()
         updateRamInfo()
-        if (!isProcessing) {
-            loadRunningApps()
-        }
+
+        // Auto-refresh daftar setiap kali activity kembali ke foreground
+        // Delay 300ms supaya Android settle dulu
+        refreshHandler.removeCallbacksAndMessages(null)
+        refreshHandler.postDelayed({
+            if (!isProcessing) {
+                loadRunningApps()
+            }
+        }, 300)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        refreshHandler.removeCallbacksAndMessages(null)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        refreshHandler.removeCallbacksAndMessages(null)
     }
 
     // ==== DATA ====
@@ -289,26 +321,18 @@ class KillerActivity : AppCompatActivity() {
             .show()
     }
 
-    /**
-     * Kill via Accessibility Service dengan timing OPTIMAL.
-     * Total ~1 detik per app.
-     */
     private fun executeKillOptimized(apps: List<KillerAppItem>) {
         isProcessing = true
         updateButtonCount()
 
         val tasks = apps.map { app ->
             val steps = mutableListOf<ActionStep>()
-            // Buka App Info
             steps.add(ActionStep.OpenAppInfo(app.packageName))
             steps.add(ActionStep.Wait(300))
-            // Klik "Paksa berhenti"
             steps.add(ActionStep.ClickByText(OemProfile.forceStopButtonLabels))
             steps.add(ActionStep.Wait(200))
-            // Klik konfirmasi
             steps.add(ActionStep.ClickByText(OemProfile.forceStopConfirmLabels))
             steps.add(ActionStep.Wait(200))
-            // Back (hanya 1x, karena App Info adalah activity teratas)
             steps.add(ActionStep.Back)
             steps.add(ActionStep.Wait(150))
             AutomationTask(app.packageName, steps)
@@ -334,6 +358,11 @@ class KillerActivity : AppCompatActivity() {
                         "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
                         Toast.LENGTH_LONG
                     ).show()
+
+                    // Refresh daftar setelah 800ms (kasih waktu Android update running apps)
+                    refreshHandler.postDelayed({
+                        loadRunningApps()
+                    }, 800)
                 }
             }
         )
