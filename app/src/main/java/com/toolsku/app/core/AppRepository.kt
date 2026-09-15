@@ -44,17 +44,12 @@ object AppRepository {
         }
 
     /**
-     * Ambil daftar app yang BENAR-BENAR RUNNING.
-     *
+     * Ambil daftar app yang benar-benar RUNNING.
      * Pakai ActivityManager.getRunningAppProcesses().
-     * Kalau hasil kosong (karena restriksi Android 10+), fallback ke getInstalledApps.
      *
-     * @param fallbackToAllApps Kalau true, tampilkan semua user apps saat running list kosong.
+     * Kalau kosong, fallback ke UsageStatsManager (threshold 5 menit).
      */
-    suspend fun getRunningApps(
-        context: Context,
-        fallbackToAllApps: Boolean = true
-    ): List<AppInfo> = withContext(Dispatchers.IO) {
+    suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
         val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val pm = context.packageManager
         val ourPackage = context.packageName
@@ -67,7 +62,8 @@ object AppRepository {
             null
         }
 
-        if (runningProcesses != null) {
+        if (runningProcesses != null && runningProcesses.size > 1) {
+            // Metode 1: getRunningAppProcesses BERHASIL
             for (process in runningProcesses) {
                 if (process.pkgList == null) continue
                 val pkg = process.pkgList.firstOrNull() ?: process.processName ?: continue
@@ -96,15 +92,67 @@ object AppRepository {
                     // App sudah tidak terinstall
                 }
             }
+            return@withContext result.sortedBy { it.label.lowercase() }
         }
 
-        // Fallback: kalau running list kosong, tampilkan semua user apps
-        if (result.isEmpty() && fallbackToAllApps) {
-            return@withContext getInstalledApps(context, includeSystem = false)
-                .filter { !it.isException }
+        // Metode 2: Fallback ke UsageStatsManager dengan threshold 5 menit
+        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+        val endTime = System.currentTimeMillis()
+        val beginTime = endTime - (5 * 60 * 1000L)  // 5 menit
+
+        val usageStats = try {
+            usm.queryUsageStats(android.app.usage.UsageStatsManager.INTERVAL_DAILY, beginTime, endTime)
+        } catch (e: Exception) {
+            null
+        } ?: return@withContext emptyList()
+
+        for (stat in usageStats) {
+            val pkg = stat.packageName ?: continue
+            if (pkg == ourPackage) continue
+            if (seen.contains(pkg)) continue
+            if (SystemApps.isSystemApp(pkg)) continue
+            if (Prefs.isException(pkg)) continue
+
+            try {
+                val appInfo = pm.getApplicationInfo(pkg, 0)
+                val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                if (isSystem) continue
+
+                val timeSinceLastUse = endTime - stat.lastTimeUsed
+                if (timeSinceLastUse > 5 * 60 * 1000L) continue
+
+                seen.add(pkg)
+                result.add(
+                    AppInfo(
+                        packageName = pkg,
+                        label = pm.getApplicationLabel(appInfo).toString(),
+                        icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
+                        isSystem = false,
+                        isException = false
+                    )
+                )
+            } catch (e: Exception) {
+                // Skip
+            }
         }
 
         result.sortBy { it.label.lowercase() }
         result
+    }
+
+    /**
+     * Kill app pakai killBackgroundProcesses().
+     * TIDAK butuh Accessibility. Cepat.
+     *
+     * @return true kalau perintah berhasil dikirim.
+     */
+    fun killWithBackgroundProcesses(context: Context, packageName: String): Boolean {
+        return try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            am.killBackgroundProcesses(packageName)
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 }
