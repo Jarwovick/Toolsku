@@ -47,11 +47,14 @@ object AppRepository {
      * Ambil daftar app yang BENAR-BENAR RUNNING.
      *
      * Pakai ActivityManager.getRunningAppProcesses().
+     * Kalau hasil kosong (karena restriksi Android 10+), fallback ke getInstalledApps.
      *
-     * Catatan: Method ini hanya mengembalikan semua process kalau targetSdk < 29.
-     * Karena Toolsku targetSdk 28, kita bisa akses semua app.
+     * @param fallbackToAllApps Kalau true, tampilkan semua user apps saat running list kosong.
      */
-    suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
+    suspend fun getRunningApps(
+        context: Context,
+        fallbackToAllApps: Boolean = true
+    ): List<AppInfo> = withContext(Dispatchers.IO) {
         val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val pm = context.packageManager
         val ourPackage = context.packageName
@@ -62,40 +65,43 @@ object AppRepository {
             am.runningAppProcesses
         } catch (e: Exception) {
             null
-        } ?: return@withContext emptyList()
+        }
 
-        for (process in runningProcesses) {
-            // Skip process kita sendiri
-            if (process.pkgList == null) continue
+        if (runningProcesses != null) {
+            for (process in runningProcesses) {
+                if (process.pkgList == null) continue
+                val pkg = process.pkgList.firstOrNull() ?: process.processName ?: continue
 
-            // Ambil package utama (bukan process sekunder)
-            val pkg = process.pkgList.firstOrNull() ?: process.processName ?: continue
+                if (pkg == ourPackage) continue
+                if (seen.contains(pkg)) continue
+                if (SystemApps.isSystemApp(pkg)) continue
+                if (Prefs.isException(pkg)) continue
 
-            if (pkg == ourPackage) continue
-            if (seen.contains(pkg)) continue
-            if (SystemApps.isSystemApp(pkg)) continue
-            if (Prefs.isException(pkg)) continue
+                try {
+                    val appInfo = pm.getApplicationInfo(pkg, 0)
+                    val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                    if (isSystem) continue
 
-            try {
-                val appInfo = pm.getApplicationInfo(pkg, 0)
-                val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-
-                // Skip system apps — kita hanya tampilkan user apps yang running
-                if (isSystem) continue
-
-                seen.add(pkg)
-                result.add(
-                    AppInfo(
-                        packageName = pkg,
-                        label = pm.getApplicationLabel(appInfo).toString(),
-                        icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
-                        isSystem = false,
-                        isException = false
+                    seen.add(pkg)
+                    result.add(
+                        AppInfo(
+                            packageName = pkg,
+                            label = pm.getApplicationLabel(appInfo).toString(),
+                            icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
+                            isSystem = false,
+                            isException = false
+                        )
                     )
-                )
-            } catch (e: Exception) {
-                // App sudah tidak terinstall
+                } catch (e: Exception) {
+                    // App sudah tidak terinstall
+                }
             }
+        }
+
+        // Fallback: kalau running list kosong, tampilkan semua user apps
+        if (result.isEmpty() && fallbackToAllApps) {
+            return@withContext getInstalledApps(context, includeSystem = false)
+                .filter { !it.isException }
         }
 
         result.sortBy { it.label.lowercase() }
