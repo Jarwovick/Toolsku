@@ -9,7 +9,6 @@ import android.provider.Settings
 import android.view.View
 import android.widget.Button
 import android.widget.ImageButton
-import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -42,6 +41,7 @@ class KillerActivity : AppCompatActivity() {
     private lateinit var tvRamUsedText: TextView
     private lateinit var tvRamAvailable: TextView
     private lateinit var tvLaunchedApps: TextView
+    private lateinit var tvLoading: TextView
 
     private var allSelected = true
     private var isProcessing = false
@@ -60,6 +60,7 @@ class KillerActivity : AppCompatActivity() {
         tvRamUsedText = findViewById(R.id.tvRamUsedText)
         tvRamAvailable = findViewById(R.id.tvRamAvailable)
         tvLaunchedApps = findViewById(R.id.tvLaunchedApps)
+        tvLoading = findViewById(R.id.tvLoading)
 
         tvHeaderTitle.text = getString(R.string.header_kill_apps_running)
 
@@ -97,7 +98,6 @@ class KillerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateRamInfo()
-        // Kalau baru selesai kill, refresh daftar
         if (!isProcessing) {
             loadRunningApps()
         }
@@ -106,19 +106,24 @@ class KillerActivity : AppCompatActivity() {
     // ==== DATA ====
 
     private fun loadRunningApps() {
+        tvLoading.visibility = View.VISIBLE
+        tvLoading.text = getString(R.string.killer_loading)
+
         lifecycleScope.launch {
-            // Ambil app yang BENAR-BENAR running
-            // Threshold 1000ms = 1 detik terakhir
-            val runningApps = AppRepository.getRunningApps(
-                this@KillerActivity,
-                withinMillis = 1000L
-            ).map { it.toKillerItem() }
+            val runningApps = AppRepository.getRunningApps(this@KillerActivity)
+                .map { it.toKillerItem() }
 
             adapter.submitList(runningApps)
             allSelected = runningApps.isNotEmpty()
             updateSelectAllIcon()
             updateButtonCount()
             updateLaunchedAppsCount(runningApps.size)
+            updateRamInfo()
+
+            tvLoading.visibility = if (runningApps.isEmpty()) View.VISIBLE else View.GONE
+            if (runningApps.isEmpty()) {
+                tvLoading.text = getString(R.string.killer_no_apps)
+            }
         }
     }
 
@@ -262,7 +267,6 @@ class KillerActivity : AppCompatActivity() {
             steps.add(ActionStep.Wait(600))
             steps.add(ActionStep.ClickByText(OemProfile.forceStopConfirmLabels))
             steps.add(ActionStep.Wait(600))
-            // Back 2x untuk keluar dari App Info
             steps.add(ActionStep.Back)
             steps.add(ActionStep.Wait(300))
             steps.add(ActionStep.Back)
@@ -277,7 +281,6 @@ class KillerActivity : AppCompatActivity() {
             onComplete = { stats ->
                 runOnUiThread {
                     isProcessing = false
-                    // Kembali ke Toolsku
                     val intent = Intent(this, KillerActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     }
@@ -287,7 +290,6 @@ class KillerActivity : AppCompatActivity() {
                         "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
                         Toast.LENGTH_LONG
                     ).show()
-                    // Refresh daftar
                     updateRamInfo()
                     loadRunningApps()
                 }
