@@ -6,14 +6,8 @@ import android.content.pm.PackageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * Mengambil daftar aplikasi terinstall.
- */
 object AppRepository {
 
-    /**
-     * Ambil daftar semua app (user + sistem), kecuali app kita sendiri.
-     */
     suspend fun getInstalledApps(context: Context, includeSystem: Boolean = false): List<AppInfo> =
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
@@ -25,8 +19,12 @@ object AppRepository {
                 if (app.packageName == ourPackage) continue
 
                 val isSystem = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                if (!includeSystem && isSystem) continue
                 if (SystemApps.isSystemApp(app.packageName)) continue
+
+                // Kalau tidak include system, skip system apps
+                if (!includeSystem && isSystem) continue
+                // Kalau include system, hanya ambil system apps
+                if (includeSystem && !isSystem) continue
 
                 result.add(
                     AppInfo(
