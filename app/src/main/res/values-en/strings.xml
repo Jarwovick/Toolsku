@@ -3,7 +3,6 @@
     <string name="app_name">Toolsku</string>
     <string name="app_tagline">Android Toolbox</string>
 
-    <!-- Header titles per halaman (English) -->
     <string name="header_home">Toolsku</string>
     <string name="header_dimmer">Screen Dimmer</string>
     <string name="header_kill_apps_running">Kill Apps Running</string>
@@ -64,11 +63,6 @@
     <string name="dimmer_channel_desc">Notification when dimming is active</string>
 
     <string name="killer_title">Kill Apps</string>
-    <string name="killer_select_all">Select All</string>
-    <string name="killer_deselect_all">Deselect All</string>
-    <string name="killer_close_apps">Close Apps (%1$d)</string>
-    <string name="killer_exception_list">Exception List</string>
-
     <string name="killer_header_title">TOOLSKU</string>
     <string name="killer_menu_desc">Menu</string>
     <string name="killer_app_menu_desc">App menu</string>
@@ -79,6 +73,7 @@
 
     <string name="killer_filter_user_apps">User apps</string>
     <string name="killer_filter_system_apps">System apps</string>
+    <string name="killer_select_all">Select All</string>
 
     <string name="killer_close_apps_zero">CLOSE APPS</string>
     <string name="killer_close_apps_count">CLOSE APPS (%1$d)</string>
@@ -92,17 +87,10 @@
     <string name="overlay_closing_subtitle">SHUTTING DOWN</string>
     <string name="overlay_closing_percent">%1$d PERCENT</string>
 
-    <!-- Killer test (fallback) -->
-    <string name="killer_test_mode">🧪 TEST MODE</string>
-    <string name="killer_test_title">Kill WhatsApp</string>
-    <string name="killer_test_desc">This button will open WhatsApp App Info, tap Force stop, and confirm.</string>
-    <string name="killer_test_button">🚀 RUN TEST</string>
-    <string name="killer_test_ready">Ready</string>
-    <string name="killer_test_running">Running automation…</string>
-    <string name="killer_test_progress">Progress: %1$d/%2$d — %3$s</string>
-    <string name="killer_test_done">Done: %1$d success, %2$d failed</string>
     <string name="killer_test_no_accessibility">Enable Accessibility first</string>
-    <string name="killer_test_queue_busy">Failed: queue is running</string>
+
+    <string name="killer_loading">Loading apps…</string>
+    <string name="killer_no_apps">No apps running</string>
 
     <string name="cleaner_title">Clear Cache</string>
     <string name="cleaner_clear_all">Clear All (%1$d)</string>
@@ -111,8 +99,13 @@
     <string name="boot_title">Boot Menu</string>
     <string name="boot_restart">Restart</string>
     <string name="boot_shutdown">Power Off</string>
+    <string name="boot_restart_desc">Open power menu to choose restart</string>
+    <string name="boot_shutdown_desc">Open power menu to choose power off</string>
     <string name="boot_hint">Both open the system power menu. You still need to choose an option there.</string>
     <string name="boot_not_supported">This feature requires Android 12 or newer</string>
+    <string name="boot_no_accessibility">Enable Accessibility first</string>
+    <string name="boot_success">Power menu opened</string>
+    <string name="boot_failed">Failed to open power menu</string>
 
     <string name="overlay_cleaning">CLEANING…</string>
     <string name="overlay_shutting">STOPPING…</string>
