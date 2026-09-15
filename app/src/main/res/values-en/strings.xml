@@ -91,6 +91,7 @@
 
     <string name="killer_loading">Loading apps…</string>
     <string name="killer_no_apps">No apps running</string>
+    <string name="killer_refresh">Refresh</string>
 
     <string name="cleaner_title">Clear Cache</string>
     <string name="cleaner_clear_all">Clear All (%1$d)</string>
