@@ -33,6 +33,15 @@ import kotlinx.coroutines.launch
 
 class KillerActivity : AppCompatActivity() {
 
+    companion object {
+        /**
+         * Interval auto-refresh (ms).
+         * Terlalu kecil = boros baterai.
+         * Terlalu besar = terasa lambat.
+         */
+        private const val AUTO_REFRESH_INTERVAL_MS = 2000L
+    }
+
     private lateinit var adapter: KillerAdapter
     private lateinit var tvHeaderTitle: TextView
     private lateinit var tvFilterLabel: TextView
@@ -49,7 +58,13 @@ class KillerActivity : AppCompatActivity() {
 
     private var allSelected = true
     private var isProcessing = false
-    private var refreshHandler = Handler(Looper.getMainLooper())
+    private var isLoading = false
+
+    private val refreshHandler = Handler(Looper.getMainLooper())
+    private var autoRefreshEnabled = false
+
+    // Cache daftar terakhir — biar tidak flicker
+    private var lastPackageSet: Set<String> = emptySet()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,7 +101,7 @@ class KillerActivity : AppCompatActivity() {
         }
 
         btnRefresh.setOnClickListener {
-            loadRunningApps()
+            loadRunningApps(forceRefresh = true)
         }
 
         btnSelectAll.setOnClickListener {
@@ -111,65 +126,88 @@ class KillerActivity : AppCompatActivity() {
         loadRunningApps()
     }
 
-    /**
-     * Dipanggil saat Activity sudah ada di backstack dan di-start ulang.
-     * Ini yang handle refresh setelah kill selesai.
-     */
-    override fun onNewIntent(intent: Intent?) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        // Refresh daftar
-        isProcessing = false
-        updateButtonCount()
-        loadRunningApps()
-    }
-
     override fun onResume() {
         super.onResume()
         updateRamInfo()
 
-        // Auto-refresh daftar setiap kali activity kembali ke foreground
-        // Delay 300ms supaya Android settle dulu
-        refreshHandler.removeCallbacksAndMessages(null)
-        refreshHandler.postDelayed({
-            if (!isProcessing) {
-                loadRunningApps()
-            }
-        }, 300)
+        // Mulai auto-refresh
+        startAutoRefresh()
     }
 
     override fun onPause() {
         super.onPause()
-        refreshHandler.removeCallbacksAndMessages(null)
+        // Stop auto-refresh saat activity tidak di foreground
+        stopAutoRefresh()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        stopAutoRefresh()
+    }
+
+    // ==== AUTO REFRESH ====
+
+    private fun startAutoRefresh() {
+        if (autoRefreshEnabled) return
+        autoRefreshEnabled = true
+
+        val runnable = object : Runnable {
+            override fun run() {
+                if (autoRefreshEnabled && !isProcessing) {
+                    loadRunningApps()
+                }
+                if (autoRefreshEnabled) {
+                    refreshHandler.postDelayed(this, AUTO_REFRESH_INTERVAL_MS)
+                }
+            }
+        }
+        refreshHandler.post(runnable)
+    }
+
+    private fun stopAutoRefresh() {
+        autoRefreshEnabled = false
         refreshHandler.removeCallbacksAndMessages(null)
     }
 
     // ==== DATA ====
 
-    private fun loadRunningApps() {
-        tvLoading.visibility = View.VISIBLE
-        tvLoading.text = getString(R.string.killer_loading)
+    /**
+     * Load daftar running apps.
+     *
+     * @param forceRefresh true kalau user klik tombol refresh manual.
+     */
+    private fun loadRunningApps(forceRefresh: Boolean = false) {
+        if (isLoading) return
+        isLoading = true
 
         lifecycleScope.launch {
-            val runningApps = AppRepository.getRunningApps(this@KillerActivity)
-                .map { it.toKillerItem() }
+            try {
+                val runningApps = AppRepository.getRunningApps(this@KillerActivity)
+                    .map { it.toKillerItem() }
 
-            adapter.submitList(runningApps)
-            allSelected = runningApps.isNotEmpty()
-            updateSelectAllIcon()
-            updateButtonCount()
-            updateLaunchedAppsCount(runningApps.size)
-            updateRamInfo()
+                val newPackageSet = runningApps.map { it.packageName }.toSet()
 
-            if (runningApps.isEmpty()) {
-                tvLoading.visibility = View.VISIBLE
-                tvLoading.text = getString(R.string.killer_no_apps)
-            } else {
-                tvLoading.visibility = View.GONE
+                // Cek apakah daftar berubah
+                val hasChanged = newPackageSet != lastPackageSet || forceRefresh
+
+                if (hasChanged) {
+                    adapter.submitList(runningApps)
+                    allSelected = runningApps.isNotEmpty()
+                    updateSelectAllIcon()
+                    updateButtonCount()
+                    updateLaunchedAppsCount(runningApps.size)
+                    updateRamInfo()
+                    lastPackageSet = newPackageSet
+
+                    if (runningApps.isEmpty()) {
+                        tvLoading.visibility = View.VISIBLE
+                        tvLoading.text = getString(R.string.killer_no_apps)
+                    } else {
+                        tvLoading.visibility = View.GONE
+                    }
+                }
+            } finally {
+                isLoading = false
             }
         }
     }
@@ -193,7 +231,7 @@ class KillerActivity : AppCompatActivity() {
             when (item.itemId) {
                 0 -> {
                     tvFilterLabel.text = getString(R.string.killer_filter_user_apps)
-                    loadRunningApps()
+                    loadRunningApps(forceRefresh = true)
                 }
                 1 -> {
                     Toast.makeText(this, "System apps — coming soon", Toast.LENGTH_SHORT).show()
@@ -295,7 +333,7 @@ class KillerActivity : AppCompatActivity() {
             Prefs.addException(item.packageName)
             Toast.makeText(this, "Ditambahkan ke pengecualian", Toast.LENGTH_SHORT).show()
         }
-        loadRunningApps()
+        loadRunningApps(forceRefresh = true)
     }
 
     // ==== KILL ====
@@ -359,10 +397,9 @@ class KillerActivity : AppCompatActivity() {
                         Toast.LENGTH_LONG
                     ).show()
 
-                    // Refresh daftar setelah 800ms (kasih waktu Android update running apps)
-                    refreshHandler.postDelayed({
-                        loadRunningApps()
-                    }, 800)
+                    // Force refresh setelah kill
+                    lastPackageSet = emptySet()
+                    loadRunningApps(forceRefresh = true)
                 }
             }
         )
