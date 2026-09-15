@@ -4,14 +4,16 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object AppRepository {
 
+    private const val TAG = "AppRepo"
+
     /**
      * Ambil daftar SEMUA app terinstall.
-     * Dipakai untuk halaman Cleaner.
      */
     suspend fun getInstalledApps(context: Context, includeSystem: Boolean = false): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -44,72 +46,50 @@ object AppRepository {
         }
 
     /**
-     * Ambil daftar app yang benar-benar RUNNING.
-     * Pakai ActivityManager.getRunningAppProcesses().
+     * Ambil daftar app yang BENAR-BENAR RUNNING.
      *
-     * Kalau kosong, fallback ke UsageStatsManager (threshold 5 menit).
+     * Pakai:
+     * 1. getRunningAppProcesses() — utama
+     * 2. getRunningServices() — tambahan
+     *
+     * TIDAK pakai UsageStatsManager (Baxa tidak pakai).
      */
     suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
-        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val pm = context.packageManager
         val ourPackage = context.packageName
-        val result = mutableListOf<AppInfo>()
-        val seen = mutableSetOf<String>()
+        val runningPackages = mutableSetOf<String>()
 
-        val runningProcesses = try {
-            am.runningAppProcesses
-        } catch (e: Exception) {
-            null
-        }
-
-        if (runningProcesses != null && runningProcesses.size > 1) {
-            // Metode 1: getRunningAppProcesses BERHASIL
-            for (process in runningProcesses) {
-                if (process.pkgList == null) continue
-                val pkg = process.pkgList.firstOrNull() ?: process.processName ?: continue
-
-                if (pkg == ourPackage) continue
-                if (seen.contains(pkg)) continue
-                if (SystemApps.isSystemApp(pkg)) continue
-                if (Prefs.isException(pkg)) continue
-
-                try {
-                    val appInfo = pm.getApplicationInfo(pkg, 0)
-                    val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                    if (isSystem) continue
-
-                    seen.add(pkg)
-                    result.add(
-                        AppInfo(
-                            packageName = pkg,
-                            label = pm.getApplicationLabel(appInfo).toString(),
-                            icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
-                            isSystem = false,
-                            isException = false
-                        )
-                    )
-                } catch (e: Exception) {
-                    // App sudah tidak terinstall
+        // ===== Metode 1: getRunningAppProcesses =====
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val processes = am.runningAppProcesses
+            if (processes != null) {
+                for (process in processes) {
+                    if (process.pkgList == null) continue
+                    val pkg = process.pkgList.firstOrNull() ?: process.processName ?: continue
+                    runningPackages.add(pkg)
                 }
             }
-            return@withContext result.sortedBy { it.label.lowercase() }
+        } catch (e: Exception) {
+            Log.e(TAG, "getRunningAppProcesses failed", e)
         }
 
-        // Metode 2: Fallback ke UsageStatsManager dengan threshold 5 menit
-        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
-        val endTime = System.currentTimeMillis()
-        val beginTime = endTime - (5 * 60 * 1000L)  // 5 menit
-
-        val usageStats = try {
-            usm.queryUsageStats(android.app.usage.UsageStatsManager.INTERVAL_DAILY, beginTime, endTime)
+        // ===== Metode 2: getRunningServices =====
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            @Suppress("DEPRECATION")
+            val services = am.getRunningServices(100)
+            for (service in services) {
+                runningPackages.add(service.service.packageName)
+            }
         } catch (e: Exception) {
-            null
-        } ?: return@withContext emptyList()
+            Log.e(TAG, "getRunningServices failed", e)
+        }
 
-        for (stat in usageStats) {
-            val pkg = stat.packageName ?: continue
+        // ===== Filter hasil =====
+        val result = mutableListOf<AppInfo>()
+        for (pkg in runningPackages) {
             if (pkg == ourPackage) continue
-            if (seen.contains(pkg)) continue
             if (SystemApps.isSystemApp(pkg)) continue
             if (Prefs.isException(pkg)) continue
 
@@ -118,10 +98,6 @@ object AppRepository {
                 val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                 if (isSystem) continue
 
-                val timeSinceLastUse = endTime - stat.lastTimeUsed
-                if (timeSinceLastUse > 5 * 60 * 1000L) continue
-
-                seen.add(pkg)
                 result.add(
                     AppInfo(
                         packageName = pkg,
@@ -132,19 +108,48 @@ object AppRepository {
                     )
                 )
             } catch (e: Exception) {
-                // Skip
+                // App sudah tidak terinstall
             }
         }
 
         result.sortBy { it.label.lowercase() }
+        Log.i(TAG, "Final running apps: ${result.size}")
         result
     }
 
     /**
+     * Cek apakah package tertentu sedang running.
+     * Dipakai untuk verifikasi setelah kill.
+     */
+    suspend fun isPackageRunning(context: Context, packageName: String): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+
+                // Cek via processes
+                val processes = am.runningAppProcesses
+                if (processes != null) {
+                    for (process in processes) {
+                        if (process.pkgList?.contains(packageName) == true) return@withContext true
+                        if (process.processName == packageName) return@withContext true
+                    }
+                }
+
+                // Cek via services
+                @Suppress("DEPRECATION")
+                val services = am.getRunningServices(100)
+                for (service in services) {
+                    if (service.service.packageName == packageName) return@withContext true
+                }
+
+                false
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+    /**
      * Kill app pakai killBackgroundProcesses().
-     * TIDAK butuh Accessibility. Cepat.
-     *
-     * @return true kalau perintah berhasil dikirim.
      */
     fun killWithBackgroundProcesses(context: Context, packageName: String): Boolean {
         return try {
