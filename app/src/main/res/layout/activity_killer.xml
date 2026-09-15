@@ -227,6 +227,15 @@
         </LinearLayout>
 
         <ImageButton
+            android:id="@+id/btnRefresh"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/killer_refresh"
+            android:src="@android:drawable/ic_menu_rotate"
+            app:tint="@color/accent" />
+
+        <ImageButton
             android:id="@+id/btnSelectAll"
             android:layout_width="48dp"
             android:layout_height="48dp"
