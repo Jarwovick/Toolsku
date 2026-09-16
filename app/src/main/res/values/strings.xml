@@ -100,6 +100,12 @@
     <string name="overlay_cleaning_title">CLEANING…</string>
     <string name="overlay_cleaning_subtitle">REMOVING CACHE</string>
 
+    <!-- Overlay notification (foreground service) -->
+    <string name="overlay_channel_name">Proses Toolsku</string>
+    <string name="overlay_channel_desc">Notifikasi saat proses berjalan</string>
+    <string name="overlay_notification_title">Toolsku berjalan</string>
+    <string name="overlay_notification_text">Proses sedang berlangsung</string>
+
     <string name="killer_test_no_accessibility">Aktifkan Aksesibilitas dulu</string>
 
     <string name="killer_loading">Memuat aplikasi…</string>
