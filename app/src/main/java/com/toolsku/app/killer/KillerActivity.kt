@@ -26,9 +26,7 @@ import com.toolsku.app.automation.AutomationTask
 import com.toolsku.app.automation.OemProfile
 import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
-import com.toolsku.app.core.PermissionHelper
 import com.toolsku.app.core.Prefs
-import com.toolsku.app.overlay.BlockerOverlayService
 import kotlinx.coroutines.launch
 
 class KillerActivity : AppCompatActivity() {
@@ -286,17 +284,19 @@ class KillerActivity : AppCompatActivity() {
         isProcessing = true
         updateButtonCount()
 
-        // Setup callback stop
-        BlockerOverlayService.onStopClick = {
-            AutomationAccessibilityService.instance?.cancelQueue()
-            hideOverlay()
+        val service = AutomationAccessibilityService.instance ?: return
+
+        // Setup stop callback
+        AutomationAccessibilityService.onStopClick = {
+            service.cancelQueue()
+            service.hideOverlay()
             isProcessing = false
             updateButtonCount()
             Toast.makeText(this, "Dibatalkan", Toast.LENGTH_SHORT).show()
         }
 
-        // Tampilkan overlay
-        showOverlay(0, apps.size, "")
+        // ⭐ Tampilkan overlay via Accessibility Service
+        service.showOverlay(0, apps.size, "", AutomationAccessibilityService.MODE_KILLER)
 
         val tasks = apps.map { app ->
             val steps = mutableListOf<ActionStep>()
@@ -311,20 +311,19 @@ class KillerActivity : AppCompatActivity() {
             AutomationTask(app.packageName, steps)
         }
 
-        val service = AutomationAccessibilityService.instance ?: return
         service.runQueue(
             tasks = tasks,
             onProgress = { current, total, pkg ->
-                updateOverlay(current, total, pkg)
+                service.updateOverlay(current, total, pkg)
             },
             onComplete = { stats ->
                 runOnUiThread {
-                    hideOverlay()
-                    BlockerOverlayService.onStopClick = null
+                    service.hideOverlay()
+                    AutomationAccessibilityService.onStopClick = null
                     isProcessing = false
                     updateButtonCount()
 
-                    // REFRESH DAFTAR LANGSUNG — tanpa restart activity
+                    // Refresh daftar
                     loadApps()
 
                     Toast.makeText(
@@ -335,34 +334,5 @@ class KillerActivity : AppCompatActivity() {
                 }
             }
         )
-    }
-
-    private fun showOverlay(current: Int, total: Int, appName: String) {
-        if (!PermissionHelper.canDrawOverlays(this)) return
-        val intent = Intent(this, BlockerOverlayService::class.java).apply {
-            action = BlockerOverlayService.ACTION_SHOW
-            putExtra(BlockerOverlayService.EXTRA_CURRENT, current)
-            putExtra(BlockerOverlayService.EXTRA_TOTAL, total)
-            putExtra(BlockerOverlayService.EXTRA_APP_NAME, appName)
-        }
-        startService(intent)
-    }
-
-    private fun updateOverlay(current: Int, total: Int, appName: String) {
-        if (!PermissionHelper.canDrawOverlays(this)) return
-        val intent = Intent(this, BlockerOverlayService::class.java).apply {
-            action = BlockerOverlayService.ACTION_UPDATE
-            putExtra(BlockerOverlayService.EXTRA_CURRENT, current)
-            putExtra(BlockerOverlayService.EXTRA_TOTAL, total)
-            putExtra(BlockerOverlayService.EXTRA_APP_NAME, appName)
-        }
-        startService(intent)
-    }
-
-    private fun hideOverlay() {
-        val intent = Intent(this, BlockerOverlayService::class.java).apply {
-            action = BlockerOverlayService.ACTION_HIDE
-        }
-        startService(intent)
     }
 }
