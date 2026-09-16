@@ -81,6 +81,13 @@ class AutomationAccessibilityService : AccessibilityService() {
 
     // ==== QUEUE ====
 
+    /**
+     * Jalankan queue otomasi.
+     *
+     * @param tasks Daftar AutomationTask
+     * @param onProgress Callback: (current, total, appLabel)
+     * @param onComplete Callback: (QueueStats)
+     */
     fun runQueue(
         tasks: List<AutomationTask>,
         onProgress: ((current: Int, total: Int, appLabel: String) -> Unit)? = null,
@@ -94,7 +101,9 @@ class AutomationAccessibilityService : AccessibilityService() {
         isRunning = true
         TaskQueue.start(tasks)
 
-        // Wrap callback: skip packageName, pakai appLabel
+        // TaskQueue.onProgress punya signature:
+        // (current, total, packageName, appLabel)
+        // Kita wrap ke (current, total, appLabel)
         TaskQueue.onProgress = { current, total, _, appLabel ->
             onProgress?.invoke(current, total, appLabel)
         }
@@ -207,7 +216,7 @@ class AutomationAccessibilityService : AccessibilityService() {
                 progressBar.progress = percent
                 tvPercent.text = percent.toString()
                 if (appLabel.isNotEmpty()) {
-                    tvAppName.text = appLabel  // ← pakai label, bukan package
+                    tvAppName.text = appLabel
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to update overlay", e)
