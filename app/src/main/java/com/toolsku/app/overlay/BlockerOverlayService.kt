@@ -50,7 +50,6 @@ class BlockerOverlayService : Service() {
     private lateinit var tvTitle: TextView
     private lateinit var tvSubtitle: TextView
 
-    // Simpan mode terakhir untuk re-show
     private var currentMode: String = MODE_KILLER
 
     private val handler = Handler(Looper.getMainLooper())
@@ -75,7 +74,7 @@ class BlockerOverlayService : Service() {
                 val total = intent.getIntExtra(EXTRA_TOTAL, 1)
                 val appName = intent.getStringExtra(EXTRA_APP_NAME) ?: ""
 
-                // PENTING: kalau overlay sudah hilang, show ulang!
+                // Kalau overlay sudah hilang, show ulang
                 if (overlayView == null) {
                     Log.w(TAG, "Overlay null on update, re-showing")
                     showOverlay(current, total, appName, currentMode)
@@ -88,7 +87,7 @@ class BlockerOverlayService : Service() {
                 stopSelf()
             }
         }
-        return START_STICKY  // Ganti dari NOT_STICKY
+        return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -134,14 +133,14 @@ class BlockerOverlayService : Service() {
                 WindowManager.LayoutParams.TYPE_PHONE
             }
 
-            // FLAG PENTING untuk overlay yang "menempel" di atas App Info:
-            val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                    or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-                    or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                    or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                    or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
-                    or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-                    or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            // Flag digabung pakai `or` di AKHIR baris
+            val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
 
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -151,7 +150,6 @@ class BlockerOverlayService : Service() {
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                // Set agar overlay selalu di atas
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     layoutInDisplayCutoutMode =
                         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
