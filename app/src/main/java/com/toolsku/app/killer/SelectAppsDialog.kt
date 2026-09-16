@@ -2,6 +2,7 @@ package com.toolsku.app.killer
 
 import android.app.Dialog
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -22,6 +23,10 @@ import com.toolsku.app.core.Prefs
 import kotlinx.coroutines.launch
 
 class SelectAppsDialog : DialogFragment() {
+
+    companion object {
+        private const val TAG = "SelectAppsDialog"
+    }
 
     private lateinit var adapter: SelectAppsAdapter
     private lateinit var tvFilterLabel: TextView
@@ -84,6 +89,8 @@ class SelectAppsDialog : DialogFragment() {
 
         view.findViewById<Button>(R.id.btnAdd).setOnClickListener {
             val selected = adapter.getSelectedPackages()
+            Log.i(TAG, "User selected: ${selected.size} apps")
+            selected.forEach { Log.d(TAG, "  - $it") }
             onSelectionComplete?.invoke(selected)
             dismiss()
         }
@@ -104,10 +111,12 @@ class SelectAppsDialog : DialogFragment() {
 
     private fun loadApps() {
         lifecycleScope.launch {
-            // ⭐ Pakai getAllApps — tidak ada filter system, semua app muncul
+            // Pakai getAllApps — tidak ada filter, semua app muncul
             allUserApps = AppRepository.getAllApps(requireContext(), onlyUser = true)
             allSystemApps = AppRepository.getAllApps(requireContext(), onlyUser = false)
                 .filter { it.isSystem }
+
+            Log.i(TAG, "User apps: ${allUserApps.size}, System apps: ${allSystemApps.size}")
 
             applyFilter()
         }
