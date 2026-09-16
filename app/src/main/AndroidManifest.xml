@@ -89,6 +89,19 @@
             android:exported="false"
             android:parentActivityName=".MainActivity" />
 
+        <!-- Quick Action (shortcut) -->
+        <activity
+            android:name=".shortcut.QuickActionActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.Toolsku.Transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <!-- Accessibility Service -->
         <service
             android:name=".automation.AutomationAccessibilityService"
