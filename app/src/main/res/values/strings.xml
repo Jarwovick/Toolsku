@@ -142,6 +142,8 @@
     <string name="overlay_cleaning">MEMBERSIHKAN…</string>
     <string name="overlay_shutting">MENGHENTIKAN…</string>
     <string name="overlay_stop">Hentikan</string>
+    <string name="overlay_cleaning_title">CLEANING…</string>
+    <string name="overlay_cleaning_subtitle">REMOVING CACHE</string>
 
     <!-- Common -->
     <string name="ok">OK</string>
