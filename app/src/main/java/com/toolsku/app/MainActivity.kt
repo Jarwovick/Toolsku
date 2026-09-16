@@ -45,21 +45,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun triggerBootMenu() {
-        // Cek izin aksesibilitas
         if (!PermissionHelper.isAccessibilityServiceEnabled(this)) {
             Toast.makeText(this, R.string.boot_no_accessibility, Toast.LENGTH_LONG).show()
-            // Arahkan ke onboarding
             startActivity(Intent(this, PermissionActivity::class.java))
             return
         }
 
-        // Cek dukungan device
         if (!BootAction.isSupported()) {
             Toast.makeText(this, R.string.boot_not_supported, Toast.LENGTH_LONG).show()
             return
         }
 
-        // Coba buka Power Menu
         val success = BootAction.openPowerMenu()
         if (success) {
             Toast.makeText(this, R.string.boot_success, Toast.LENGTH_SHORT).show()
