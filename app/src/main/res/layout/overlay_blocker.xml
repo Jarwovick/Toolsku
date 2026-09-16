@@ -13,9 +13,10 @@
 
         <!-- TITLE -->
         <TextView
+            android:id="@+id/tvTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/overlay_closing_title"
+            android:text="@string/overlay_closing_apps"
             android:textColor="@color/text_primary"
             android:textSize="22sp"
             android:textStyle="bold"
@@ -54,7 +55,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="PERCENT"
+                    android:text="@string/overlay_percent"
                     android:textColor="@color/text_secondary"
                     android:textSize="11sp"
                     android:letterSpacing="0.15" />
@@ -63,10 +64,11 @@
 
         <!-- SUBTITLE -->
         <TextView
+            android:id="@+id/tvSubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="48dp"
-            android:text="@string/overlay_closing_subtitle"
+            android:text="@string/overlay_shutting_down"
             android:textColor="@color/text_secondary"
             android:textSize="12sp"
             android:letterSpacing="0.15" />
