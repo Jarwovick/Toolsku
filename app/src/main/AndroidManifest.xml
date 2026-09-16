@@ -77,7 +77,7 @@
             android:exported="false"
             android:parentActivityName=".killer.KillerActivity" />
 
-        <!-- Cleaner -->
+        <!-- Cleaner (folder baru) -->
         <activity
             android:name=".cleaner.CleanerActivity"
             android:exported="false"
@@ -103,7 +103,7 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- Overlay blocker (non-foreground) -->
+        <!-- Overlay blocker -->
         <service
             android:name=".overlay.BlockerOverlayService"
             android:exported="false" />
