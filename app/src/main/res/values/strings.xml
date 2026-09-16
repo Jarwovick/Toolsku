@@ -89,14 +89,15 @@
     <string name="killer_menu_add_exception">Tambah ke pengecualian</string>
     <string name="killer_menu_remove_exception">Hapus dari pengecualian</string>
 
-    <string name="overlay_closing_title">MENUTUP APLIKASI</string>
+    <string name="overlay_closing_title">CLOSING APPS</string>
+    <string name="overlay_closing_apps">CLOSING APPS</string>
     <string name="overlay_closing_subtitle">SHUTTING DOWN</string>
     <string name="overlay_closing_percent">%1$d PERCENT</string>
+    <string name="overlay_percent">PERCENT</string>
+    <string name="overlay_shutting_down">SHUTTING DOWN</string>
 
-    <!-- Killer test (fallback) -->
     <string name="killer_test_no_accessibility">Aktifkan Aksesibilitas dulu</string>
 
-    <!-- Loading -->
     <string name="killer_loading">Memuat aplikasi…</string>
     <string name="killer_no_apps">Tidak ada aplikasi berjalan</string>
     <string name="killer_refresh">Refresh</string>
@@ -110,6 +111,7 @@
     <string name="exception_remove">Hapus dari pengecualian</string>
     <string name="exception_added">Ditambahkan ke pengecualian</string>
     <string name="exception_removed">Dihapus dari pengecualian</string>
+
     <string name="select_apps_title">SELECT APPS</string>
     <string name="search">Cari</string>
     <string name="add">Tambah</string>
