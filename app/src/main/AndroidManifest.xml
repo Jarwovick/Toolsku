@@ -2,31 +2,31 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Izin untuk menampilkan overlay di atas aplikasi lain -->
+    <!-- Overlay -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- Izin untuk melihat daftar semua aplikasi -->
+    <!-- Lihat semua app -->
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
-    <!-- Izin untuk membaca ukuran cache/data aplikasi -->
+    <!-- Ukuran cache -->
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
-    <!-- Izin untuk mematikan background process (fallback) -->
+    <!-- Kill background process -->
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
 
-    <!-- Izin untuk mendapat daftar running apps (legacy, tapi masih berguna) -->
+    <!-- Daftar running apps -->
     <uses-permission android:name="android.permission.GET_TASKS" />
 
-    <!-- Izin untuk mengunci rotasi saat otomasi -->
+    <!-- Kunci rotasi saat otomasi -->
     <uses-permission
         android:name="android.permission.WRITE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 
-    <!-- Foreground service untuk dimmer -->
+    <!-- Foreground service (dimmer) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -41,7 +41,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Toolsku"
-        tools:targetApi="34">
+        tools:targetApi="28">
 
         <!-- Home -->
         <activity
@@ -54,19 +54,19 @@
             </intent-filter>
         </activity>
 
-        <!-- Onboarding izin -->
+        <!-- Onboarding -->
         <activity
             android:name=".onboarding.PermissionActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
 
-        <!-- Modul Peredupan -->
+        <!-- Dimmer -->
         <activity
             android:name=".dimmer.DimmerActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
 
-        <!-- Modul Hentikan Aplikasi -->
+        <!-- Killer -->
         <activity
             android:name=".killer.KillerActivity"
             android:exported="false"
@@ -77,32 +77,19 @@
             android:exported="false"
             android:parentActivityName=".killer.KillerActivity" />
 
-        <!-- Modul Bersihkan Cache -->
+        <!-- Cleaner -->
         <activity
             android:name=".cleaner.CleanerActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
 
-        <!-- Modul Boot Menu -->
+        <!-- Boot -->
         <activity
             android:name=".boot.BootActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
 
-        <!-- Quick Action (untuk shortcut) -->
-        <activity
-            android:name=".shortcut.QuickActionActivity"
-            android:exported="true"
-            android:excludeFromRecents="true"
-            android:noHistory="true"
-            android:theme="@style/Theme.Toolsku.Transparent">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
-
-        <!-- Accessibility Service (inti otomasi) -->
+        <!-- Accessibility Service -->
         <service
             android:name=".automation.AutomationAccessibilityService"
             android:exported="true"
@@ -116,7 +103,7 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- Overlay blocker service -->
+        <!-- Overlay blocker (non-foreground) -->
         <service
             android:name=".overlay.BlockerOverlayService"
             android:exported="false" />
