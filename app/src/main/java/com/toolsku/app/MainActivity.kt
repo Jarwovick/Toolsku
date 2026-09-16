@@ -11,6 +11,7 @@ import com.toolsku.app.core.PermissionHelper
 import com.toolsku.app.dimmer.DimmerActivity
 import com.toolsku.app.killer.KillerActivity
 import com.toolsku.app.onboarding.PermissionActivity
+import com.toolsku.app.shortcut.ShortcutHelper
 
 class MainActivity : AppCompatActivity() {
 
@@ -33,9 +34,14 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, KillerActivity::class.java))
         }
 
-        // Card 4: Boot Menu — LANGSUNG buka Power Menu
+        // Card 4: Boot Menu
         findViewById<LinearLayout>(R.id.cardBoot).setOnClickListener {
             triggerBootMenu()
+        }
+
+        // Tombol: Buat Shortcut
+        findViewById<LinearLayout>(R.id.btnCreateShortcut).setOnClickListener {
+            ShortcutHelper.requestPinShortcut(this)
         }
 
         // Settings
