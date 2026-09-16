@@ -21,9 +21,6 @@ import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.Prefs
 import kotlinx.coroutines.launch
 
-/**
- * Dialog untuk memilih app yang akan ditambahkan ke exception list.
- */
 class SelectAppsDialog : DialogFragment() {
 
     private lateinit var adapter: SelectAppsAdapter
@@ -71,24 +68,20 @@ class SelectAppsDialog : DialogFragment() {
             adapter = this@SelectAppsDialog.adapter
         }
 
-        // Filter dropdown
         view.findViewById<LinearLayout>(R.id.btnFilter).setOnClickListener {
             showFilterMenu()
         }
 
-        // Select all
         btnSelectAll.setOnClickListener {
             val newState = !adapter.isAllSelected()
             adapter.selectAll(newState)
             updateSelectAllIcon()
         }
 
-        // Cancel
         view.findViewById<Button>(R.id.btnCancel).setOnClickListener {
             dismiss()
         }
 
-        // Add
         view.findViewById<Button>(R.id.btnAdd).setOnClickListener {
             val selected = adapter.getSelectedPackages()
             onSelectionComplete?.invoke(selected)
@@ -111,8 +104,9 @@ class SelectAppsDialog : DialogFragment() {
 
     private fun loadApps() {
         lifecycleScope.launch {
-            allUserApps = AppRepository.getInstalledApps(requireContext(), includeSystem = false)
-            allSystemApps = AppRepository.getInstalledApps(requireContext(), includeSystem = true)
+            // ⭐ Pakai getAllApps — tidak ada filter system, semua app muncul
+            allUserApps = AppRepository.getAllApps(requireContext(), onlyUser = true)
+            allSystemApps = AppRepository.getAllApps(requireContext(), onlyUser = false)
                 .filter { it.isSystem }
 
             applyFilter()
