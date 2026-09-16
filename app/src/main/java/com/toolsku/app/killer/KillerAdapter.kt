@@ -10,13 +10,15 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.toolsku.app.R
 
-/**
- * Adapter untuk daftar app di halaman Killer.
- */
 class KillerAdapter(
     private val onItemClick: (KillerAppItem) -> Unit,
     private val onMenuClick: (KillerAppItem, View) -> Unit
-) : RecyclerView.Adapter<KillerAdapter.ViewHolder>() {
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+
+    companion object {
+        private const val TYPE_APP = 0
+        private const val TYPE_HEADER = 1
+    }
 
     private val items = mutableListOf<KillerAppItem>()
 
@@ -28,34 +30,64 @@ class KillerAdapter(
 
     fun getItems(): List<KillerAppItem> = items
 
-    fun updateSelected(pkg: String, selected: Boolean) {
-        val index = items.indexOfFirst { it.packageName == pkg }
-        if (index >= 0) {
-            items[index].selected = selected
-            notifyItemChanged(index)
-        }
-    }
+    /**
+     * Ambil semua app (bukan header).
+     */
+    fun getAppItems(): List<KillerAppItem> = items.filter { !it.isSectionHeader }
 
+    /**
+     * Select all / deselect all app (bukan header).
+     */
     fun selectAll(selected: Boolean) {
+        var changed = false
         for (i in items.indices) {
-            items[i].selected = selected
+            if (!items[i].isSectionHeader) {
+                if (items[i].selected != selected) {
+                    items[i].selected = selected
+                    changed = true
+                }
+            }
         }
-        notifyDataSetChanged()
+        if (changed) {
+            notifyDataSetChanged()
+        }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_app_killer, parent, false)
-        return ViewHolder(view)
+    override fun getItemViewType(position: Int): Int {
+        return if (items[position].isSectionHeader) TYPE_HEADER else TYPE_APP
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(items[position])
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        return if (viewType == TYPE_HEADER) {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_section_header, parent, false)
+            HeaderViewHolder(view)
+        } else {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_app_killer, parent, false)
+            AppViewHolder(view)
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        val item = items[position]
+        when (holder) {
+            is HeaderViewHolder -> holder.bind(item.headerTitle)
+            is AppViewHolder -> holder.bind(item)
+        }
     }
 
     override fun getItemCount(): Int = items.size
 
-    inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    inner class HeaderViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val tvSectionTitle: TextView = itemView.findViewById(R.id.tvSectionTitle)
+
+        fun bind(title: String) {
+            tvSectionTitle.text = title
+        }
+    }
+
+    inner class AppViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val ivAppIcon: ImageView = itemView.findViewById(R.id.ivAppIcon)
         private val tvAppName: TextView = itemView.findViewById(R.id.tvAppName)
         private val btnAppMenu: ImageButton = itemView.findViewById(R.id.btnAppMenu)
