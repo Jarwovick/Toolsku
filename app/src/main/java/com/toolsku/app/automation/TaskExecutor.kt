@@ -47,7 +47,7 @@ class TaskExecutor(
         when (step) {
             is ActionStep.OpenAppInfo -> {
                 if (openAppInfo(step.packageName)) {
-                    delay(800) { executeStep(task, stepIndex + 1) }
+                    delay(400) { executeStep(task, stepIndex + 1) }
                 } else {
                     finish(TaskResult.Error("Failed to open App Info"))
                 }
@@ -55,15 +55,15 @@ class TaskExecutor(
 
             is ActionStep.ClickByText -> {
                 if (clickByText(step.texts)) {
-                    delay(400) { executeStep(task, stepIndex + 1) }
+                    delay(250) { executeStep(task, stepIndex + 1) }
                 } else {
-                    finish(TaskResult.NodeNotFound(step, "Text not found"))
+                    finish(TaskResult.NodeNotFound(step, "Text not found or disabled"))
                 }
             }
 
             is ActionStep.ClickByTextSafe -> {
                 if (clickByTextSafe(step.texts, step.dangerTexts)) {
-                    delay(400) { executeStep(task, stepIndex + 1) }
+                    delay(250) { executeStep(task, stepIndex + 1) }
                 } else {
                     finish(TaskResult.NodeNotFound(step, "Safe text not found"))
                 }
@@ -71,7 +71,7 @@ class TaskExecutor(
 
             is ActionStep.Back -> {
                 service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
-                delay(400) { executeStep(task, stepIndex + 1) }
+                delay(200) { executeStep(task, stepIndex + 1) }
             }
 
             is ActionStep.Wait -> {
@@ -88,6 +88,8 @@ class TaskExecutor(
         }
     }
 
+    // ==== ACTIONS ====
+
     private fun openAppInfo(pkg: String): Boolean {
         return try {
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -102,16 +104,53 @@ class TaskExecutor(
         }
     }
 
+    /**
+     * Klik node yang ada di daftar texts.
+     * SKIP kalau node disabled (tombol abu-abu).
+     */
     private fun clickByText(texts: List<String>): Boolean {
         val root = service.rootInActiveWindow ?: return false
         val node = NodeFinder.findByText(root, texts) ?: return false
-        return performClick(node)
+
+        // ⭐ Skip kalau node disabled
+        if (!node.isEnabled) {
+            Log.w(TAG, "Node found but DISABLED: ${texts.firstOrNull()}")
+            return false
+        }
+
+        // Cek clickable parent
+        if (node.isClickable) {
+            return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+
+        val clickableParent = NodeFinder.findClickableParent(node)
+        if (clickableParent != null && clickableParent.isEnabled) {
+            return clickableParent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+
+        Log.w(TAG, "Node not clickable: ${texts.firstOrNull()}")
+        return false
     }
 
     private fun clickByTextSafe(texts: List<String>, dangerTexts: List<String>): Boolean {
         val root = service.rootInActiveWindow ?: return false
         val node = NodeFinder.findByTextSafe(root, texts, dangerTexts) ?: return false
-        return performClick(node)
+
+        if (!node.isEnabled) {
+            Log.w(TAG, "Safe node found but DISABLED")
+            return false
+        }
+
+        if (node.isClickable) {
+            return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+
+        val clickableParent = NodeFinder.findClickableParent(node)
+        if (clickableParent != null && clickableParent.isEnabled) {
+            return clickableParent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+
+        return false
     }
 
     private fun expectText(texts: List<String>): Boolean {
@@ -119,16 +158,7 @@ class TaskExecutor(
         return NodeFinder.findByText(root, texts) != null
     }
 
-    private fun performClick(node: AccessibilityNodeInfo): Boolean {
-        if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-            return true
-        }
-        val parent = NodeFinder.findClickableParent(node)
-        if (parent != null && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-            return true
-        }
-        return false
-    }
+    // ==== UTIL ====
 
     private fun delay(millis: Long, action: () -> Unit) {
         handler.postDelayed(action, millis)
