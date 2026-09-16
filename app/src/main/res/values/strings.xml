@@ -110,6 +110,9 @@
     <string name="exception_remove">Hapus dari pengecualian</string>
     <string name="exception_added">Ditambahkan ke pengecualian</string>
     <string name="exception_removed">Dihapus dari pengecualian</string>
+    <string name="select_apps_title">SELECT APPS</string>
+    <string name="search">Cari</string>
+    <string name="add">Tambah</string>
 
     <!-- Cleaner -->
     <string name="cleaner_title">Bersihkan Cache</string>
