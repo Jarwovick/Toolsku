@@ -187,44 +187,16 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- FILTER BAR -->
+    <!-- TOP BAR (refresh + select all, tanpa filter) -->
     <LinearLayout
         android:id="@+id/filterBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
         android:orientation="horizontal"
-        android:gravity="center_vertical"
+        android:gravity="end"
         android:paddingHorizontal="20dp"
         app:layout_constraintTop_toBottomOf="@id/ramCard">
-
-        <LinearLayout
-            android:id="@+id/btnFilter"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:clickable="true"
-            android:focusable="true"
-            android:padding="8dp">
-
-            <TextView
-                android:id="@+id/tvFilterLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/killer_filter_user_apps"
-                android:textColor="@color/accent"
-                android:textSize="15sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="▾"
-                android:textColor="@color/accent"
-                android:textSize="15sp" />
-        </LinearLayout>
 
         <ImageButton
             android:id="@+id/btnRefresh"
