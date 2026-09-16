@@ -49,8 +49,7 @@ object AppRepository {
 
     /**
      * Ambil daftar app di exception list.
-     * SEMUA package muncul, tanpa terkecuali.
-     * Kalau getApplicationInfo gagal, tetap tampilkan dengan package name.
+     * HANYA app yang masih terinstall — skip yang tidak terinstall.
      */
     suspend fun getExceptionApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -61,39 +60,30 @@ object AppRepository {
             Log.i(TAG, "getExceptionApps: ${exceptionPackages.size} packages in Prefs")
 
             for (pkg in exceptionPackages) {
-                var label = pkg
-                var icon: android.graphics.drawable.Drawable? = null
-                var isSystem = false
-
                 try {
                     val appInfo = pm.getApplicationInfo(pkg, 0)
-                    isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                    label = try {
+                    val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+
+                    val label = try {
                         pm.getApplicationLabel(appInfo).toString()
                     } catch (e: Exception) {
                         pkg
                     }
-                    icon = try {
-                        pm.getApplicationIcon(appInfo)
-                    } catch (e: Exception) {
-                        null
-                    }
+
+                    result.add(
+                        AppInfo(
+                            packageName = pkg,
+                            label = label,
+                            icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
+                            isSystem = isSystem,
+                            isException = true
+                        )
+                    )
                     Log.d(TAG, "Found: $pkg — $label")
                 } catch (e: PackageManager.NameNotFoundException) {
-                    Log.w(TAG, "NOT FOUND: $pkg — using fallback")
-                    label = pkg
+                    // App TIDAK terinstall — SKIP
+                    Log.w(TAG, "SKIP (not installed): $pkg")
                 }
-
-                // SELALU tambahkan — apapun yang terjadi
-                result.add(
-                    AppInfo(
-                        packageName = pkg,
-                        label = label,
-                        icon = icon,
-                        isSystem = isSystem,
-                        isException = true
-                    )
-                )
             }
 
             result.sortBy { it.label.lowercase() }
