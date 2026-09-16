@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="20dp"
+    android:layout_marginTop="8dp"
+    android:background="@drawable/bg_app_item"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="16dp">
+
+    <ImageView
+        android:id="@+id/ivAppIcon"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <TextView
+        android:id="@+id/tvAppName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_weight="1"
+        android:text="App Name"
+        android:textColor="@color/text_primary"
+        android:textSize="15sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <ImageButton
+        android:id="@+id/btnRemove"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/exception_remove"
+        android:src="@drawable/ic_remove"
+        android:tint="@color/accent" />
+
+</LinearLayout>
