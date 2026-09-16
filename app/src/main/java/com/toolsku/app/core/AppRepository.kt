@@ -5,7 +5,6 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
-import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -13,8 +12,6 @@ import kotlinx.coroutines.withContext
 object AppRepository {
 
     private const val TAG = "AppRepo"
-
-    // Threshold "recently used" untuk fallback
     private const val USAGE_THRESHOLD_MS = 5 * 60 * 1000L  // 5 menit
 
     /**
@@ -52,6 +49,8 @@ object AppRepository {
 
     /**
      * Ambil daftar app di exception list.
+     * SEMUA package muncul, tanpa terkecuali.
+     * Kalau getApplicationInfo gagal, tetap tampilkan dengan package name.
      */
     suspend fun getExceptionApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -59,31 +58,52 @@ object AppRepository {
             val exceptionPackages = Prefs.exceptionList
             val result = mutableListOf<AppInfo>()
 
+            Log.i(TAG, "getExceptionApps: ${exceptionPackages.size} packages in Prefs")
+
             for (pkg in exceptionPackages) {
+                var label = pkg
+                var icon: android.graphics.drawable.Drawable? = null
+                var isSystem = false
+
                 try {
                     val appInfo = pm.getApplicationInfo(pkg, 0)
-                    val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-
-                    result.add(
-                        AppInfo(
-                            packageName = pkg,
-                            label = pm.getApplicationLabel(appInfo).toString(),
-                            icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
-                            isSystem = isSystem,
-                            isException = true
-                        )
-                    )
+                    isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                    label = try {
+                        pm.getApplicationLabel(appInfo).toString()
+                    } catch (e: Exception) {
+                        pkg
+                    }
+                    icon = try {
+                        pm.getApplicationIcon(appInfo)
+                    } catch (e: Exception) {
+                        null
+                    }
+                    Log.d(TAG, "Found: $pkg — $label")
                 } catch (e: PackageManager.NameNotFoundException) {
-                    Log.w(TAG, "Exception app not found: $pkg")
+                    Log.w(TAG, "NOT FOUND: $pkg — using fallback")
+                    label = pkg
                 }
+
+                // SELALU tambahkan — apapun yang terjadi
+                result.add(
+                    AppInfo(
+                        packageName = pkg,
+                        label = label,
+                        icon = icon,
+                        isSystem = isSystem,
+                        isException = true
+                    )
+                )
             }
 
             result.sortBy { it.label.lowercase() }
+            Log.i(TAG, "getExceptionApps result: ${result.size}")
             result
         }
 
     /**
      * Ambil semua app untuk dialog SELECT APPS.
+     * TIDAK filter dangerous — user boleh pilih apa saja.
      */
     suspend fun getAllApps(context: Context, onlyUser: Boolean = false): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -94,7 +114,6 @@ object AppRepository {
 
             for (app in packages) {
                 if (app.packageName == ourPackage) continue
-                if (SystemApps.isDangerousSystemApp(app.packageName)) continue
 
                 val isSystem = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                 if (onlyUser && isSystem) continue
@@ -145,11 +164,7 @@ object AppRepository {
         }
 
     /**
-     * Ambil daftar app RUNNING (3 metode).
-     *
-     * 1. getRunningAppProcesses() — app foreground
-     * 2. getRunningServices() — app dengan service aktif
-     * 3. UsageStatsManager (5 menit) — app yang baru dipakai
+     * Ambil daftar app RUNNING (kombinasi 3 metode).
      */
     suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
@@ -212,7 +227,7 @@ object AppRepository {
             Log.e(TAG, "UsageStats failed", e)
         }
 
-        // === Convert ke AppInfo ===
+        // === Convert ===
         val result = mutableListOf<AppInfo>()
         for (pkg in runningPackages) {
             if (pkg == ourPackage) continue
@@ -222,8 +237,6 @@ object AppRepository {
             try {
                 val appInfo = pm.getApplicationInfo(pkg, 0)
                 val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-
-                // Skip system apps dari running list — mereka di-handle oleh getSafeSystemApps
                 if (isSystem) continue
 
                 result.add(
@@ -236,7 +249,7 @@ object AppRepository {
                     )
                 )
             } catch (e: Exception) {
-                // App sudah uninstall
+                // Skip
             }
         }
 
