@@ -166,4 +166,11 @@
     <string name="shortcut_short_label">Toolsku</string>
     <string name="shortcut_long_label">Jalankan Toolsku</string>
     <string name="shortcut_disabled">Toolsku</string>
+    <string name="shortcut_create_button">Buat Shortcut</string>
+    <string name="shortcut_created">Shortcut dibuat</string>
+    <string name="shortcut_pin_dialog">Tambahkan Toolsku Quick ke layar utama?</string>
+
+    <!-- Quick Action -->
+    <string name="quick_action_title">OPTIMIZING…</string>
+    <string name="quick_action_subtitle">CLEANING &amp; KILLING</string>
 </resources>
