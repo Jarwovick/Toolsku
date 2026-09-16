@@ -5,8 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
@@ -288,10 +286,6 @@ class KillerActivity : AppCompatActivity() {
 
         val service = AutomationAccessibilityService.instance ?: return
 
-        // ⭐ Tandai semua app yang akan di-kill SEBELUM proses
-        apps.forEach { AppRepository.markAsKilled(it.packageName) }
-
-        // Setup stop callback
         AutomationAccessibilityService.onStopClick = {
             service.cancelQueue()
             service.hideOverlay()
@@ -300,7 +294,6 @@ class KillerActivity : AppCompatActivity() {
             Toast.makeText(this, "Dibatalkan", Toast.LENGTH_SHORT).show()
         }
 
-        // Tampilkan overlay
         service.showOverlay(0, apps.size, "", AutomationAccessibilityService.MODE_KILLER)
 
         val tasks = apps.map { app ->
@@ -313,13 +306,14 @@ class KillerActivity : AppCompatActivity() {
             steps.add(ActionStep.Wait(200))
             steps.add(ActionStep.Back)
             steps.add(ActionStep.Wait(150))
-            AutomationTask(app.packageName, steps)
+            // Pass appLabel
+            AutomationTask(app.packageName, app.label, steps)
         }
 
         service.runQueue(
             tasks = tasks,
-            onProgress = { current, total, pkg ->
-                service.updateOverlay(current, total, pkg)
+            onProgress = { current, total, appLabel ->
+                service.updateOverlay(current, total, appLabel)
             },
             onComplete = { stats ->
                 runOnUiThread {
@@ -327,12 +321,7 @@ class KillerActivity : AppCompatActivity() {
                     AutomationAccessibilityService.onStopClick = null
                     isProcessing = false
                     updateButtonCount()
-
-                    // ⭐ Delay 1.5 detik supaya Android update running list
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        loadApps()
-                    }, 1500)
-
+                    loadApps()
                     Toast.makeText(
                         this,
                         "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
