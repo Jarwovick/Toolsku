@@ -12,20 +12,20 @@ object OemProfile {
 
     // ==== FORCE STOP ====
 
-    /** Tombol "Paksa berhenti" di halaman App Info (atas). */
+    /** Tombol "Paksa berhenti" di halaman App Info. */
     val forceStopButtonLabels = listOf(
-        "Paksa berhenti",      // ID (ColorOS 15, Realme UI 1.0)
-        "Force stop",           // EN
-        "强制停止",              // ZH
-        "強制停止",              // ZH-TW
+        "Paksa berhenti",
+        "Force stop",
+        "强制停止",
+        "強制停止",
     )
 
     /** Tombol konfirmasi di dialog force stop. */
     val forceStopConfirmLabels = listOf(
-        "Paksa berhenti",      // ID — di dialog konfirmasi
-        "Force stop",           // EN
-        "OK",                   // fallback umum
-        "Ya",                   // fallback
+        "Paksa berhenti",
+        "Force stop",
+        "OK",
+        "Ya",
     )
 
     /** Tombol cancel — HARUS DIHINDARI. */
@@ -40,21 +40,21 @@ object OemProfile {
 
     /** Menu "Penyimpanan" / "Penggunaan penyimpanan". */
     val storageMenuLabels = listOf(
-        "Penyimpanan & cache",       // ID (format baru)
-        "Storage & cache",           // EN
-        "Penggunaan penyimpanan",    // ID (ColorOS 15 — dari screenshot)
-        "Storage usage",             // EN
-        "Penyimpanan",               // ID (singkat)
-        "Storage",                   // EN (singkat)
-        "存储",                      // ZH
+        "Penyimpanan & cache",
+        "Storage & cache",
+        "Penggunaan penyimpanan",
+        "Storage usage",
+        "Penyimpanan",
+        "Storage",
+        "存储",
     )
 
     /** Tombol "Hapus cache" — yang akan DIKLIK. */
     val clearCacheLabels = listOf(
-        "Hapus cache",         // ID
-        "Clear cache",          // EN
-        "清除缓存",             // ZH
-        "清除快取",             // ZH-TW
+        "Hapus cache",
+        "Clear cache",
+        "清除缓存",
+        "清除快取",
     )
 
     /** Tombol "Hapus data" — HARUS DIHINDARI (danger). */
