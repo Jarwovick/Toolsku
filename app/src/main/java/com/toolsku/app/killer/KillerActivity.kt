@@ -44,7 +44,6 @@ class KillerActivity : AppCompatActivity() {
     private lateinit var tvLaunchedApps: TextView
     private lateinit var tvLoading: TextView
 
-    private var allSelected = true
     private var isProcessing = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,7 +66,7 @@ class KillerActivity : AppCompatActivity() {
         tvHeaderTitle.text = getString(R.string.header_kill_apps_running)
 
         adapter = KillerAdapter(
-            onItemClick = { updateButtonCount() },
+            onItemClick = { updateSelectAllState() },
             onMenuClick = { item, view -> showAppMenu(item, view) }
         )
         findViewById<RecyclerView>(R.id.rvApps).apply {
@@ -80,8 +79,10 @@ class KillerActivity : AppCompatActivity() {
         }
 
         btnSelectAll.setOnClickListener {
-            allSelected = !allSelected
-            adapter.selectAll(allSelected)
+            // Cek state aktual dari adapter, BUKAN dari flag
+            val allCurrentlySelected = adapter.getAppItems().all { it.selected }
+            val newState = !allCurrentlySelected
+            adapter.selectAll(newState)
             updateSelectAllIcon()
             updateButtonCount()
         }
@@ -120,7 +121,6 @@ class KillerActivity : AppCompatActivity() {
             val userApps = AppRepository.getRunningApps(this@KillerActivity)
             val systemApps = AppRepository.getSafeSystemApps(this@KillerActivity)
 
-            // Gabung dengan section header
             val combined = mutableListOf<KillerAppItem>()
             if (userApps.isNotEmpty()) {
                 combined.add(KillerAppItem.section("USER APPS (${userApps.size})"))
@@ -132,7 +132,6 @@ class KillerActivity : AppCompatActivity() {
             }
 
             adapter.submitList(combined)
-            allSelected = true
             updateSelectAllIcon()
             updateButtonCount()
             updateLaunchedAppsCount(userApps.size + systemApps.size)
@@ -194,7 +193,23 @@ class KillerActivity : AppCompatActivity() {
         btnCloseApps.alpha = if (btnCloseApps.isEnabled) 1f else 0.5f
     }
 
-    private fun updateSelectAllIcon() {
+    /**
+     * Cek state aktual dari adapter — bukan dari flag.
+     * Ini yang fix bug checkbox.
+     */
+    private fun updateSelectAllState() {
+        val apps = adapter.getAppItems()
+        val allSelected = apps.isNotEmpty() && apps.all { it.selected }
+        updateSelectAllIcon(allSelected)
+        updateButtonCount()
+    }
+
+    private fun updateSelectAllIcon(forceState: Boolean? = null) {
+        val allSelected = forceState ?: run {
+            val apps = adapter.getAppItems()
+            apps.isNotEmpty() && apps.all { it.selected }
+        }
+
         btnSelectAll.setImageResource(
             if (allSelected) R.drawable.ic_checkbox_checked
             else R.drawable.ic_checkbox_unchecked
