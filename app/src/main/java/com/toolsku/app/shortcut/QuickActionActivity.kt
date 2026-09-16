@@ -1,5 +1,6 @@
 package com.toolsku.app.shortcut
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -14,7 +15,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Quick Action — dijalankan dari shortcut home screen.
- * Langsung kill all + clear cache tanpa UI.
+ * Kill running apps + clear cache.
  */
 class QuickActionActivity : AppCompatActivity() {
 
@@ -28,35 +29,33 @@ class QuickActionActivity : AppCompatActivity() {
         val service = AutomationAccessibilityService.instance
         if (service == null) {
             Toast.makeText(this, "Aktifkan Aksesibilitas dulu", Toast.LENGTH_LONG).show()
-            finish()
+            goHome()
             return
         }
 
         lifecycleScope.launch {
             try {
-                // 1. Ambil app untuk KILL (user apps running)
+                // === 1. Ambil running apps untuk KILL ===
                 val runningApps = AppRepository.getRunningApps(this@QuickActionActivity)
                 Log.i(TAG, "Running apps: ${runningApps.size}")
 
-                // 2. Ambil app untuk CLEAR CACHE (safe system apps)
+                // === 2. Ambil safe system apps untuk CLEAR CACHE ===
                 var systemApps = AppRepository.getSafeSystemApps(this@QuickActionActivity)
                 Log.i(TAG, "Safe system apps: ${systemApps.size}")
 
-                // Fallback: kalau system apps kosong, ambil user apps untuk clear cache
+                // === 3. Fallback: pakai user apps untuk clear cache ===
                 if (systemApps.isEmpty()) {
-                    Log.w(TAG, "No safe system apps found, using user apps for cache clear")
+                    Log.w(TAG, "No safe system apps, fallback to user apps")
                     val allUserApps = AppRepository.getInstalledApps(
                         this@QuickActionActivity,
                         includeSystem = false
                     )
-                    // Ambil 20 app pertama (biar tidak terlalu lama)
                     systemApps = allUserApps.take(20)
-                    Log.i(TAG, "Fallback user apps for cache: ${systemApps.size}")
                 }
 
                 val allTasks = mutableListOf<AutomationTask>()
 
-                // TASK 1: Kill user apps yang running
+                // TASK 1: Kill user apps running
                 for (app in runningApps) {
                     val steps = mutableListOf<ActionStep>()
                     steps.add(ActionStep.OpenAppInfo(app.packageName))
@@ -70,7 +69,7 @@ class QuickActionActivity : AppCompatActivity() {
                     allTasks.add(AutomationTask(app.packageName, app.label, steps))
                 }
 
-                // TASK 2: Clear cache (system apps ATAU fallback user apps)
+                // TASK 2: Clear cache
                 for (app in systemApps) {
                     val steps = mutableListOf<ActionStep>()
                     steps.add(ActionStep.OpenAppInfo(app.packageName))
@@ -89,7 +88,7 @@ class QuickActionActivity : AppCompatActivity() {
                     allTasks.add(AutomationTask(app.packageName, app.label, steps))
                 }
 
-                Log.i(TAG, "Total tasks: ${allTasks.size} (kill=${runningApps.size}, clean=${systemApps.size})")
+                Log.i(TAG, "Total: kill=${runningApps.size}, clean=${systemApps.size}, all=${allTasks.size}")
 
                 if (allTasks.isEmpty()) {
                     Toast.makeText(
@@ -97,7 +96,7 @@ class QuickActionActivity : AppCompatActivity() {
                         "Tidak ada app untuk diproses",
                         Toast.LENGTH_SHORT
                     ).show()
-                    finish()
+                    goHome()
                     return@launch
                 }
 
@@ -105,16 +104,17 @@ class QuickActionActivity : AppCompatActivity() {
                 AutomationAccessibilityService.onStopClick = {
                     service.cancelQueue()
                     service.hideOverlay()
-                    finish()
+                    goHome()
                 }
 
-                // Show overlay — pakai CLEANER mode kalau ada task clean
+                // Pilih mode overlay
                 val mode = if (systemApps.isNotEmpty()) {
                     AutomationAccessibilityService.MODE_CLEANER
                 } else {
                     AutomationAccessibilityService.MODE_KILLER
                 }
 
+                // Show overlay
                 service.showOverlay(0, allTasks.size, "", mode)
 
                 // Jalankan queue
@@ -127,12 +127,15 @@ class QuickActionActivity : AppCompatActivity() {
                         runOnUiThread {
                             service.hideOverlay()
                             AutomationAccessibilityService.onStopClick = null
+
                             Toast.makeText(
                                 this@QuickActionActivity,
                                 "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
                                 Toast.LENGTH_LONG
                             ).show()
-                            finish()
+
+                            // Kembali ke HOME (bukan Toolsku)
+                            goHome()
                         }
                     }
                 )
@@ -144,8 +147,20 @@ class QuickActionActivity : AppCompatActivity() {
                     "Error: ${e.message}",
                     Toast.LENGTH_LONG
                 ).show()
-                finish()
+                goHome()
             }
         }
+    }
+
+    /**
+     * Kembali ke home screen device.
+     */
+    private fun goHome() {
+        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        startActivity(homeIntent)
+        finish()
     }
 }
