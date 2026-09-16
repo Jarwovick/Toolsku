@@ -6,7 +6,6 @@ import androidx.preference.PreferenceManager
 
 /**
  * Penyimpanan preferensi Toolsku.
- * Semua setting disimpan di satu file SharedPreferences.
  */
 object Prefs {
 
@@ -32,19 +31,20 @@ object Prefs {
 
     // === Exception List ===
     var exceptionList: Set<String>
-        get() = prefs.getStringSet(KEY_EXCEPTION_LIST, defaultExceptionList()) ?: defaultExceptionList()
-        set(value) = prefs.edit().putStringSet(KEY_EXCEPTION_LIST, value).apply()
+        get() = prefs.getStringSet(KEY_EXCEPTION_LIST, emptySet()) ?: emptySet()
+        set(value) = prefs.edit().putStringSet(KEY_EXCEPTION_LIST, value.toSet()).apply()
 
     fun addException(pkg: String) {
         val current = exceptionList.toMutableSet()
         current.add(pkg)
-        exceptionList = current
+        // Set pakai toSet() untuk trigger save
+        exceptionList = current.toSet()
     }
 
     fun removeException(pkg: String) {
         val current = exceptionList.toMutableSet()
         current.remove(pkg)
-        exceptionList = current
+        exceptionList = current.toSet()
     }
 
     fun isException(pkg: String): Boolean = exceptionList.contains(pkg)
@@ -53,18 +53,4 @@ object Prefs {
     var isFirstLaunch: Boolean
         get() = prefs.getBoolean(KEY_FIRST_LAUNCH, true)
         set(value) = prefs.edit().putBoolean(KEY_FIRST_LAUNCH, value).apply()
-
-    /**
-     * Daftar pengecualian default.
-     * App di list ini TIDAK di-force-stop, tapi tetap di-clear-cache.
-     */
-    private fun defaultExceptionList(): Set<String> = setOf(
-        "com.whatsapp",
-        "org.telegram.messenger",
-        "tw.nekomimi.nekogram",
-        "com.twitter.android",
-        "com.yahoo.mobile.client.android.mail",
-        "com.google.android.gm",
-        "com.microsoft.office.outlook"
-    )
 }
