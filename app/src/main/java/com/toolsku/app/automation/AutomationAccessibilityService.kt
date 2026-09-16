@@ -25,7 +25,6 @@ class AutomationAccessibilityService : AccessibilityService() {
         var instance: AutomationAccessibilityService? = null
             private set
 
-        // Mode overlay
         const val MODE_KILLER = "killer"
         const val MODE_CLEANER = "cleaner"
 
@@ -36,7 +35,6 @@ class AutomationAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var isRunning = false
 
-    // Overlay state
     private lateinit var windowManager: WindowManager
     private var overlayView: View? = null
     private lateinit var progressCircle: ProgressBar
@@ -85,7 +83,7 @@ class AutomationAccessibilityService : AccessibilityService() {
 
     fun runQueue(
         tasks: List<AutomationTask>,
-        onProgress: ((current: Int, total: Int, pkg: String) -> Unit)? = null,
+        onProgress: ((current: Int, total: Int, appLabel: String) -> Unit)? = null,
         onComplete: ((QueueStats) -> Unit)? = null
     ): Boolean {
         if (isRunning) {
@@ -95,7 +93,11 @@ class AutomationAccessibilityService : AccessibilityService() {
 
         isRunning = true
         TaskQueue.start(tasks)
-        TaskQueue.onProgress = onProgress
+
+        // Wrap callback: skip packageName, pakai appLabel
+        TaskQueue.onProgress = { current, total, _, appLabel ->
+            onProgress?.invoke(current, total, appLabel)
+        }
 
         processNextTask(onComplete)
         return true
@@ -126,17 +128,13 @@ class AutomationAccessibilityService : AccessibilityService() {
         executor.cleanup()
     }
 
-    // ==== OVERLAY (pakai TYPE_ACCESSIBILITY_OVERLAY) ====
+    // ==== OVERLAY ====
 
-    /**
-     * Tampilkan overlay pakai TYPE_ACCESSIBILITY_OVERLAY.
-     * Tipe ini bisa menutupi Settings/App Info — tidak seperti TYPE_APPLICATION_OVERLAY.
-     */
-    fun showOverlay(current: Int, total: Int, appName: String, mode: String) {
+    fun showOverlay(current: Int, total: Int, appLabel: String, mode: String) {
         currentMode = mode
 
         if (overlayView != null) {
-            updateOverlay(current, total, appName)
+            updateOverlay(current, total, appLabel)
             return
         }
 
@@ -163,7 +161,6 @@ class AutomationAccessibilityService : AccessibilityService() {
                 onStopClick?.invoke()
             }
 
-            // ⭐ KUNCI: pakai TYPE_ACCESSIBILITY_OVERLAY
             val type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
 
             val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -189,19 +186,16 @@ class AutomationAccessibilityService : AccessibilityService() {
             }
 
             windowManager.addView(overlayView, params)
-
-            updateOverlay(current, total, appName)
-
-            Log.i(TAG, "Accessibility overlay shown (mode=$mode)")
+            updateOverlay(current, total, appLabel)
+            Log.i(TAG, "Overlay shown (mode=$mode)")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to show accessibility overlay", e)
+            Log.e(TAG, "Failed to show overlay", e)
         }
     }
 
-    fun updateOverlay(current: Int, total: Int, appName: String) {
+    fun updateOverlay(current: Int, total: Int, appLabel: String) {
         if (overlayView == null) {
-            Log.w(TAG, "Overlay null — re-showing")
-            showOverlay(current, total, appName, currentMode)
+            showOverlay(current, total, appLabel, currentMode)
             return
         }
 
@@ -212,8 +206,8 @@ class AutomationAccessibilityService : AccessibilityService() {
                 progressCircle.progress = percent
                 progressBar.progress = percent
                 tvPercent.text = percent.toString()
-                if (appName.isNotEmpty()) {
-                    tvAppName.text = appName
+                if (appLabel.isNotEmpty()) {
+                    tvAppName.text = appLabel  // ← pakai label, bukan package
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to update overlay", e)
