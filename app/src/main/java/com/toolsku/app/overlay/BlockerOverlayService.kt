@@ -18,10 +18,6 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import com.toolsku.app.R
 
-/**
- * Service yang menampilkan overlay full-screen saat otomasi berjalan.
- * Dipakai oleh Killer ("CLOSING APPS") dan Cleaner ("CLEANING…").
- */
 class BlockerOverlayService : Service() {
 
     companion object {
@@ -54,6 +50,9 @@ class BlockerOverlayService : Service() {
     private lateinit var tvTitle: TextView
     private lateinit var tvSubtitle: TextView
 
+    // Simpan mode terakhir untuk re-show
+    private var currentMode: String = MODE_KILLER
+
     private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
@@ -68,20 +67,28 @@ class BlockerOverlayService : Service() {
                 val total = intent.getIntExtra(EXTRA_TOTAL, 1)
                 val appName = intent.getStringExtra(EXTRA_APP_NAME) ?: ""
                 val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_KILLER
+                currentMode = mode
                 showOverlay(current, total, appName, mode)
             }
             ACTION_UPDATE -> {
                 val current = intent.getIntExtra(EXTRA_CURRENT, 0)
                 val total = intent.getIntExtra(EXTRA_TOTAL, 1)
                 val appName = intent.getStringExtra(EXTRA_APP_NAME) ?: ""
-                updateOverlay(current, total, appName)
+
+                // PENTING: kalau overlay sudah hilang, show ulang!
+                if (overlayView == null) {
+                    Log.w(TAG, "Overlay null on update, re-showing")
+                    showOverlay(current, total, appName, currentMode)
+                } else {
+                    updateOverlay(current, total, appName)
+                }
             }
             ACTION_HIDE -> {
                 hideOverlay()
                 stopSelf()
             }
         }
-        return START_NOT_STICKY
+        return START_STICKY  // Ganti dari NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -108,7 +115,6 @@ class BlockerOverlayService : Service() {
             tvTitle = overlayView!!.findViewById(R.id.tvTitle)
             tvSubtitle = overlayView!!.findViewById(R.id.tvSubtitle)
 
-            // Set judul & subtitle sesuai mode
             if (mode == MODE_CLEANER) {
                 tvTitle.text = getString(R.string.overlay_cleaning_title)
                 tvSubtitle.text = getString(R.string.overlay_cleaning_subtitle)
@@ -117,7 +123,6 @@ class BlockerOverlayService : Service() {
                 tvSubtitle.text = getString(R.string.overlay_shutting_down)
             }
 
-            // Tombol stop
             overlayView!!.findViewById<FrameLayout>(R.id.btnStop).setOnClickListener {
                 onStopClick?.invoke()
             }
@@ -129,17 +134,28 @@ class BlockerOverlayService : Service() {
                 WindowManager.LayoutParams.TYPE_PHONE
             }
 
+            // FLAG PENTING untuk overlay yang "menempel" di atas App Info:
+            val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                    or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                    or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                    or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                    or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+                    or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                    or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
                 type,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                        or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                        or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                flags,
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
+                // Set agar overlay selalu di atas
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
             }
 
             windowManager.addView(overlayView, params)
@@ -154,7 +170,10 @@ class BlockerOverlayService : Service() {
     }
 
     private fun updateOverlay(current: Int, total: Int, appName: String) {
-        if (overlayView == null) return
+        if (overlayView == null) {
+            Log.w(TAG, "Cannot update — overlay is null")
+            return
+        }
 
         val percent = if (total > 0) ((current.toFloat() / total) * 100).toInt() else 0
 
