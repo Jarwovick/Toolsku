@@ -1,5 +1,6 @@
 package com.toolsku.app.killer
 
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageButton
@@ -11,9 +12,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.toolsku.app.R
-import com.toolsku.app.core.AppRepository
+import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.Prefs
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ExceptionActivity : AppCompatActivity() {
 
@@ -25,19 +28,15 @@ class ExceptionActivity : AppCompatActivity() {
         setContentView(R.layout.activity_exception)
         title = getString(R.string.exception_title)
 
-        // Header
         findViewById<TextView>(R.id.tvHeaderTitle).text =
             getString(R.string.header_exception_list)
 
-        // Back button
         findViewById<ImageButton>(R.id.btnBack).setOnClickListener {
             onBackPressedDispatcher.onBackPressed()
         }
 
-        // Empty text
         tvEmpty = findViewById(R.id.tvEmpty)
 
-        // Adapter
         adapter = ExceptionAdapter(
             onRemoveClick = { pkg -> removeException(pkg) }
         )
@@ -46,7 +45,6 @@ class ExceptionActivity : AppCompatActivity() {
             adapter = this@ExceptionActivity.adapter
         }
 
-        // FAB Add
         findViewById<FloatingActionButton>(R.id.fabAdd).setOnClickListener {
             showSelectAppsDialog()
         }
@@ -54,33 +52,38 @@ class ExceptionActivity : AppCompatActivity() {
         loadExceptions()
     }
 
-    override fun onResume() {
-        super.onResume()
-        loadExceptions()
-    }
-
     private fun loadExceptions() {
         lifecycleScope.launch {
             val exceptionPackages = Prefs.exceptionList
 
-            // Ambil user apps + system apps (gabung, distinct)
-            val userApps = AppRepository.getInstalledApps(
-                this@ExceptionActivity,
-                includeSystem = false
-            )
-            val systemApps = AppRepository.getInstalledApps(
-                this@ExceptionActivity,
-                includeSystem = true
-            )
-            val allApps = (userApps + systemApps).distinctBy { it.packageName }
+            if (exceptionPackages.isEmpty()) {
+                adapter.submitList(emptyList())
+                tvEmpty.visibility = View.VISIBLE
+                return@launch
+            }
 
-            val exceptionApps = allApps.filter {
-                exceptionPackages.contains(it.packageName)
-            }.sortedBy { it.label.lowercase() }
+            // AMBIL LANGSUNG per-package (cepat!)
+            val apps = withContext(Dispatchers.IO) {
+                val pm = packageManager
+                exceptionPackages.mapNotNull { pkg ->
+                    try {
+                        val appInfo = pm.getApplicationInfo(pkg, 0)
+                        AppInfo(
+                            packageName = pkg,
+                            label = pm.getApplicationLabel(appInfo).toString(),
+                            icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
+                            isSystem = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0,
+                            isException = true
+                        )
+                    } catch (e: PackageManager.NameNotFoundException) {
+                        null  // App sudah di-uninstall
+                    }
+                }.sortedBy { it.label.lowercase() }
+            }
 
-            adapter.submitList(exceptionApps)
+            adapter.submitList(apps)
 
-            if (exceptionApps.isEmpty()) {
+            if (apps.isEmpty()) {
                 tvEmpty.visibility = View.VISIBLE
             } else {
                 tvEmpty.visibility = View.GONE
@@ -97,7 +100,6 @@ class ExceptionActivity : AppCompatActivity() {
     private fun showSelectAppsDialog() {
         val dialog = SelectAppsDialog()
         dialog.setOnSelectionComplete { selected ->
-            // Simpan pilihan baru (gabung dengan yang lama)
             val current = Prefs.exceptionList.toMutableSet()
             current.addAll(selected)
             Prefs.exceptionList = current
