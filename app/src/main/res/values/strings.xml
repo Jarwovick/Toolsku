@@ -89,12 +89,16 @@
     <string name="killer_menu_add_exception">Tambah ke pengecualian</string>
     <string name="killer_menu_remove_exception">Hapus dari pengecualian</string>
 
+    <!-- Overlay -->
     <string name="overlay_closing_title">CLOSING APPS</string>
     <string name="overlay_closing_apps">CLOSING APPS</string>
     <string name="overlay_closing_subtitle">SHUTTING DOWN</string>
     <string name="overlay_closing_percent">%1$d PERCENT</string>
     <string name="overlay_percent">PERCENT</string>
     <string name="overlay_shutting_down">SHUTTING DOWN</string>
+
+    <string name="overlay_cleaning_title">CLEANING…</string>
+    <string name="overlay_cleaning_subtitle">REMOVING CACHE</string>
 
     <string name="killer_test_no_accessibility">Aktifkan Aksesibilitas dulu</string>
 
@@ -142,8 +146,6 @@
     <string name="overlay_cleaning">MEMBERSIHKAN…</string>
     <string name="overlay_shutting">MENGHENTIKAN…</string>
     <string name="overlay_stop">Hentikan</string>
-    <string name="overlay_cleaning_title">CLEANING…</string>
-    <string name="overlay_cleaning_subtitle">REMOVING CACHE</string>
 
     <!-- Common -->
     <string name="ok">OK</string>
