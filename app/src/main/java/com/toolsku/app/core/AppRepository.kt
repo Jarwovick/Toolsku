@@ -5,6 +5,7 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -13,12 +14,11 @@ object AppRepository {
 
     private const val TAG = "AppRepo"
 
-    // Threshold "running" — 1 menit terakhir
-    private const val RUNNING_THRESHOLD_MS = 60 * 1000L
+    // Threshold "recently used" untuk fallback
+    private const val USAGE_THRESHOLD_MS = 5 * 60 * 1000L  // 5 menit
 
     /**
      * Ambil daftar SEMUA app terinstall (user + system).
-     * Untuk Cleaner.
      */
     suspend fun getInstalledApps(context: Context, includeSystem: Boolean = false): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -51,8 +51,7 @@ object AppRepository {
         }
 
     /**
-     * Ambil daftar SEMUA app yang ada di exception list.
-     * Cari LANGSUNG per package (tanpa filter).
+     * Ambil daftar app di exception list.
      */
     suspend fun getExceptionApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -75,7 +74,6 @@ object AppRepository {
                         )
                     )
                 } catch (e: PackageManager.NameNotFoundException) {
-                    // App sudah di-uninstall — skip
                     Log.w(TAG, "Exception app not found: $pkg")
                 }
             }
@@ -85,8 +83,7 @@ object AppRepository {
         }
 
     /**
-     * Ambil daftar SEMUA app terinstall (untuk dialog SELECT APPS).
-     * Termasuk system apps.
+     * Ambil semua app untuk dialog SELECT APPS.
      */
     suspend fun getAllApps(context: Context, onlyUser: Boolean = false): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -118,7 +115,7 @@ object AppRepository {
         }
 
     /**
-     * Ambil daftar system apps yang AMAN di-kill.
+     * Ambil safe system apps.
      */
     suspend fun getSafeSystemApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -148,12 +145,11 @@ object AppRepository {
         }
 
     /**
-     * Ambil daftar app RUNNING (akurat).
+     * Ambil daftar app RUNNING (3 metode).
      *
-     * Strategi:
-     * 1. getRunningAppProcesses() — akurat untuk app foreground
-     * 2. UsageStatsManager (1 menit) — untuk app yang baru dipakai
-     * 3. Gabungkan, hilangkan duplikat
+     * 1. getRunningAppProcesses() — app foreground
+     * 2. getRunningServices() — app dengan service aktif
+     * 3. UsageStatsManager (5 menit) — app yang baru dipakai
      */
     suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
@@ -167,22 +163,35 @@ object AppRepository {
             if (processes != null) {
                 for (process in processes) {
                     if (process.pkgList == null) continue
-                    val pkg = process.pkgList.firstOrNull() ?: process.processName ?: continue
-                    if (pkg != ourPackage) {
-                        runningPackages.add(pkg)
+                    for (pkg in process.pkgList) {
+                        if (pkg != ourPackage) runningPackages.add(pkg)
                     }
                 }
             }
-            Log.d(TAG, "getRunningAppProcesses: ${runningPackages.size} found")
+            Log.d(TAG, "Method 1 (Processes): ${runningPackages.size}")
         } catch (e: Exception) {
             Log.e(TAG, "getRunningAppProcesses failed", e)
         }
 
-        // === 2. UsageStats (1 menit terakhir) ===
+        // === 2. getRunningServices ===
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            @Suppress("DEPRECATION")
+            val services = am.getRunningServices(200)
+            for (service in services) {
+                val pkg = service.service.packageName
+                if (pkg != ourPackage) runningPackages.add(pkg)
+            }
+            Log.d(TAG, "Method 2 (Services): ${runningPackages.size}")
+        } catch (e: Exception) {
+            Log.e(TAG, "getRunningServices failed", e)
+        }
+
+        // === 3. UsageStatsManager (5 menit) ===
         try {
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val endTime = System.currentTimeMillis()
-            val beginTime = endTime - RUNNING_THRESHOLD_MS
+            val beginTime = endTime - USAGE_THRESHOLD_MS
 
             val usageStats = usm.queryUsageStats(
                 UsageStatsManager.INTERVAL_DAILY,
@@ -193,17 +202,17 @@ object AppRepository {
                 for (stat in usageStats) {
                     val pkg = stat.packageName ?: continue
                     val timeSinceLastUse = endTime - stat.lastTimeUsed
-                    if (timeSinceLastUse <= RUNNING_THRESHOLD_MS && pkg != ourPackage) {
+                    if (timeSinceLastUse <= USAGE_THRESHOLD_MS && pkg != ourPackage) {
                         runningPackages.add(pkg)
                     }
                 }
             }
-            Log.d(TAG, "After UsageStats: ${runningPackages.size} found")
+            Log.d(TAG, "Method 3 (UsageStats): ${runningPackages.size}")
         } catch (e: Exception) {
             Log.e(TAG, "UsageStats failed", e)
         }
 
-        // === 3. Filter & convert ===
+        // === Convert ke AppInfo ===
         val result = mutableListOf<AppInfo>()
         for (pkg in runningPackages) {
             if (pkg == ourPackage) continue
@@ -214,7 +223,7 @@ object AppRepository {
                 val appInfo = pm.getApplicationInfo(pkg, 0)
                 val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
 
-                // Skip system apps — user apps saja
+                // Skip system apps dari running list — mereka di-handle oleh getSafeSystemApps
                 if (isSystem) continue
 
                 result.add(
@@ -227,7 +236,7 @@ object AppRepository {
                     )
                 )
             } catch (e: Exception) {
-                // Skip
+                // App sudah uninstall
             }
         }
 
