@@ -5,10 +5,13 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object AppRepository {
+
+    private const val TAG = "AppRepo"
 
     /**
      * Ambil daftar SEMUA user app terinstall.
@@ -44,20 +47,46 @@ object AppRepository {
         }
 
     /**
-     * Ambil daftar system apps yang AMAN di-kill.
-     * (galeri, kamera, browser, dll)
+     * Ambil daftar safe system apps yang SEDANG RUNNING.
+     *
+     * Hanya tampilkan system app yang benar-benar aktif.
+     * Kalau tidak ada info running (ColorOS kadang kosong), fallback tampilkan semua.
      */
     suspend fun getSafeSystemApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
-            val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-            val result = mutableListOf<AppInfo>()
             val ourPackage = context.packageName
+            val result = mutableListOf<AppInfo>()
 
+            // Ambil daftar running process
+            val runningPackages = mutableSetOf<String>()
+            try {
+                val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                val processes = am.runningAppProcesses
+                if (processes != null) {
+                    for (process in processes) {
+                        if (process.pkgList == null) continue
+                        process.pkgList.forEach { runningPackages.add(it) }
+                    }
+                }
+                Log.d(TAG, "Running packages: ${runningPackages.size}")
+            } catch (e: Exception) {
+                Log.e(TAG, "getRunningAppProcesses failed", e)
+            }
+
+            // Kalau getRunningAppProcesses kosong, fallback: tampilkan semua safe system apps
+            val hasRunningInfo = runningPackages.size > 1
+
+            val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
             for (app in packages) {
                 if (app.packageName == ourPackage) continue
                 if (!SystemApps.isSafeSystemApp(app.packageName)) continue
                 if (Prefs.isException(app.packageName)) continue
+
+                // Kalau kita punya info running, filter system apps yang running saja
+                if (hasRunningInfo && !runningPackages.contains(app.packageName)) {
+                    continue
+                }
 
                 result.add(
                     AppInfo(
@@ -71,11 +100,12 @@ object AppRepository {
             }
 
             result.sortBy { it.label.lowercase() }
+            Log.i(TAG, "Safe system apps (running): ${result.size}")
             result
         }
 
     /**
-     * Ambil daftar app RUNNING (user apps).
+     * Ambil daftar user apps yang BENAR-BENAR RUNNING.
      * Pakai getRunningAppProcesses, fallback UsageStats.
      */
     suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
@@ -99,6 +129,7 @@ object AppRepository {
                 if (pkg == ourPackage) continue
                 if (seen.contains(pkg)) continue
                 if (SystemApps.isDangerousSystemApp(pkg)) continue
+                if (SystemApps.isSystemApp(pkg)) continue
                 if (Prefs.isException(pkg)) continue
 
                 try {
@@ -139,6 +170,7 @@ object AppRepository {
             if (pkg == ourPackage) continue
             if (seen.contains(pkg)) continue
             if (SystemApps.isDangerousSystemApp(pkg)) continue
+            if (SystemApps.isSystemApp(pkg)) continue
             if (Prefs.isException(pkg)) continue
 
             try {
