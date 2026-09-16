@@ -3,12 +3,12 @@ package com.toolsku.app.shortcut
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.toolsku.app.automation.ActionStep
 import com.toolsku.app.automation.AutomationAccessibilityService
 import com.toolsku.app.automation.AutomationTask
 import com.toolsku.app.automation.OemProfile
 import com.toolsku.app.core.AppRepository
-import com.toolsku.app.core.Prefs
 import kotlinx.coroutines.launch
 
 /**
@@ -27,16 +27,15 @@ class QuickActionActivity : AppCompatActivity() {
             return
         }
 
-        // Jalankan di background
-        androidx.lifecycle.lifecycleScope.launch {
+        lifecycleScope.launch {
             try {
-                // 1. Kumpulkan app untuk kill
+                // Kumpulkan app untuk kill
                 val runningApps = AppRepository.getRunningApps(this@QuickActionActivity)
                 val systemApps = AppRepository.getSafeSystemApps(this@QuickActionActivity)
 
                 val allTasks = mutableListOf<AutomationTask>()
 
-                // Task kill untuk user apps
+                // Task 1: Kill user apps
                 for (app in runningApps) {
                     val steps = mutableListOf<ActionStep>()
                     steps.add(ActionStep.OpenAppInfo(app.packageName))
@@ -47,11 +46,10 @@ class QuickActionActivity : AppCompatActivity() {
                     steps.add(ActionStep.Wait(200))
                     steps.add(ActionStep.Back)
                     steps.add(ActionStep.Wait(150))
-                    // ⭐ PASS appLabel
                     allTasks.add(AutomationTask(app.packageName, app.label, steps))
                 }
 
-                // Task clear cache untuk system apps
+                // Task 2: Clear cache system apps
                 for (app in systemApps) {
                     val steps = mutableListOf<ActionStep>()
                     steps.add(ActionStep.OpenAppInfo(app.packageName))
@@ -67,15 +65,33 @@ class QuickActionActivity : AppCompatActivity() {
                     steps.add(ActionStep.Wait(200))
                     steps.add(ActionStep.Back)
                     steps.add(ActionStep.Wait(200))
-                    // ⭐ PASS appLabel
                     allTasks.add(AutomationTask(app.packageName, app.label, steps))
                 }
 
                 if (allTasks.isEmpty()) {
-                    Toast.makeText(this@QuickActionActivity, "Tidak ada app untuk diproses", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this@QuickActionActivity,
+                        "Tidak ada app untuk diproses",
+                        Toast.LENGTH_SHORT
+                    ).show()
                     finish()
                     return@launch
                 }
+
+                // Setup stop callback (tidak ada tombol, tapi jaga-jaga)
+                AutomationAccessibilityService.onStopClick = {
+                    service.cancelQueue()
+                    service.hideOverlay()
+                    finish()
+                }
+
+                // Show overlay
+                service.showOverlay(
+                    0,
+                    allTasks.size,
+                    "",
+                    AutomationAccessibilityService.MODE_KILLER
+                )
 
                 // Jalankan queue
                 service.runQueue(
@@ -86,6 +102,7 @@ class QuickActionActivity : AppCompatActivity() {
                     onComplete = { stats ->
                         runOnUiThread {
                             service.hideOverlay()
+                            AutomationAccessibilityService.onStopClick = null
                             Toast.makeText(
                                 this@QuickActionActivity,
                                 "Selesai: ${stats.success} sukses",
@@ -96,11 +113,12 @@ class QuickActionActivity : AppCompatActivity() {
                     }
                 )
 
-                // Tampilkan overlay di awal
-                service.showOverlay(0, allTasks.size, "", AutomationAccessibilityService.MODE_KILLER)
-
             } catch (e: Exception) {
-                Toast.makeText(this@QuickActionActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this@QuickActionActivity,
+                    "Error: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
                 finish()
             }
         }
