@@ -41,7 +41,12 @@ class ExceptionAdapter(
 
         fun bind(item: AppInfo) {
             tvAppName.text = item.label
-            ivAppIcon.setImageDrawable(item.icon)
+
+            if (item.icon != null) {
+                ivAppIcon.setImageDrawable(item.icon)
+            } else {
+                ivAppIcon.setImageResource(android.R.drawable.sym_def_app_icon)
+            }
 
             btnRemove.setOnClickListener {
                 onRemoveClick(item.packageName)
