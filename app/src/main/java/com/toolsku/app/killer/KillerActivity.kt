@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
@@ -286,6 +288,9 @@ class KillerActivity : AppCompatActivity() {
 
         val service = AutomationAccessibilityService.instance ?: return
 
+        // ⭐ Tandai semua app yang akan di-kill SEBELUM proses
+        apps.forEach { AppRepository.markAsKilled(it.packageName) }
+
         // Setup stop callback
         AutomationAccessibilityService.onStopClick = {
             service.cancelQueue()
@@ -295,7 +300,7 @@ class KillerActivity : AppCompatActivity() {
             Toast.makeText(this, "Dibatalkan", Toast.LENGTH_SHORT).show()
         }
 
-        // ⭐ Tampilkan overlay via Accessibility Service
+        // Tampilkan overlay
         service.showOverlay(0, apps.size, "", AutomationAccessibilityService.MODE_KILLER)
 
         val tasks = apps.map { app ->
@@ -323,8 +328,10 @@ class KillerActivity : AppCompatActivity() {
                     isProcessing = false
                     updateButtonCount()
 
-                    // Refresh daftar
-                    loadApps()
+                    // ⭐ Delay 1.5 detik supaya Android update running list
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        loadApps()
+                    }, 1500)
 
                     Toast.makeText(
                         this,
