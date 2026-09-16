@@ -10,17 +10,20 @@ import com.toolsku.app.automation.ActionStep
 import com.toolsku.app.automation.AutomationAccessibilityService
 import com.toolsku.app.automation.AutomationTask
 import com.toolsku.app.automation.OemProfile
+import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
+import com.toolsku.app.core.CacheSizeFetcher
 import kotlinx.coroutines.launch
 
 /**
  * Quick Action — dijalankan dari shortcut home screen.
- * Kill running apps + clear cache.
+ * Kill running apps + clear cache (filter 10 MB).
  */
 class QuickActionActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "ToolskuQuick"
+        private const val MIN_CACHE_SIZE = 10 * 1024 * 1024L  // 10 MB
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,19 +42,36 @@ class QuickActionActivity : AppCompatActivity() {
                 val runningApps = AppRepository.getRunningApps(this@QuickActionActivity)
                 Log.i(TAG, "Running apps: ${runningApps.size}")
 
-                // === 2. Ambil safe system apps untuk CLEAR CACHE ===
-                var systemApps = AppRepository.getSafeSystemApps(this@QuickActionActivity)
-                Log.i(TAG, "Safe system apps: ${systemApps.size}")
+                // === 2. Ambil kandidat app untuk CLEAR CACHE ===
+                val candidateApps = mutableListOf<AppInfo>()
 
-                // === 3. Fallback: pakai user apps untuk clear cache ===
-                if (systemApps.isEmpty()) {
-                    Log.w(TAG, "No safe system apps, fallback to user apps")
-                    val allUserApps = AppRepository.getInstalledApps(
-                        this@QuickActionActivity,
-                        includeSystem = false
-                    )
-                    systemApps = allUserApps.take(20)
+                // Safe system apps
+                val systemApps = AppRepository.getSafeSystemApps(this@QuickActionActivity)
+                candidateApps.addAll(systemApps)
+
+                // User apps (biar bisa clear cache app user juga)
+                val userApps = AppRepository.getInstalledApps(
+                    this@QuickActionActivity,
+                    includeSystem = false
+                )
+                candidateApps.addAll(userApps)
+
+                // Hapus duplikat
+                val uniqueCandidates = candidateApps.distinctBy { it.packageName }
+                Log.i(TAG, "Candidates for cache: ${uniqueCandidates.size}")
+
+                // === 3. Query cache size untuk SEMUA kandidat ===
+                val cacheSizes = CacheSizeFetcher.getCacheSizes(
+                    this@QuickActionActivity,
+                    uniqueCandidates.map { it.packageName }
+                )
+
+                // === 4. Filter: HANYA yang cache >= 10 MB ===
+                val appsToClean = uniqueCandidates.filter { app ->
+                    val cacheSize = cacheSizes[app.packageName] ?: 0L
+                    cacheSize >= MIN_CACHE_SIZE
                 }
+                Log.i(TAG, "Apps to clean (≥ 10 MB): ${appsToClean.size}")
 
                 val allTasks = mutableListOf<AutomationTask>()
 
@@ -69,8 +89,8 @@ class QuickActionActivity : AppCompatActivity() {
                     allTasks.add(AutomationTask(app.packageName, app.label, steps))
                 }
 
-                // TASK 2: Clear cache
-                for (app in systemApps) {
+                // TASK 2: Clear cache (HANYA yang ≥ 10 MB)
+                for (app in appsToClean) {
                     val steps = mutableListOf<ActionStep>()
                     steps.add(ActionStep.OpenAppInfo(app.packageName))
                     steps.add(ActionStep.Wait(400))
@@ -88,7 +108,7 @@ class QuickActionActivity : AppCompatActivity() {
                     allTasks.add(AutomationTask(app.packageName, app.label, steps))
                 }
 
-                Log.i(TAG, "Total: kill=${runningApps.size}, clean=${systemApps.size}, all=${allTasks.size}")
+                Log.i(TAG, "Total tasks: kill=${runningApps.size}, clean=${appsToClean.size}, all=${allTasks.size}")
 
                 if (allTasks.isEmpty()) {
                     Toast.makeText(
@@ -108,7 +128,7 @@ class QuickActionActivity : AppCompatActivity() {
                 }
 
                 // Pilih mode overlay
-                val mode = if (systemApps.isNotEmpty()) {
+                val mode = if (appsToClean.isNotEmpty()) {
                     AutomationAccessibilityService.MODE_CLEANER
                 } else {
                     AutomationAccessibilityService.MODE_KILLER
@@ -134,7 +154,7 @@ class QuickActionActivity : AppCompatActivity() {
                                 Toast.LENGTH_LONG
                             ).show()
 
-                            // Kembali ke HOME (bukan Toolsku)
+                            // Kembali ke HOME
                             goHome()
                         }
                     }
