@@ -1,6 +1,5 @@
 package com.toolsku.app.cleaner
 
-import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
@@ -20,8 +19,6 @@ import com.toolsku.app.automation.AutomationTask
 import com.toolsku.app.automation.OemProfile
 import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.CacheSizeFetcher
-import com.toolsku.app.core.PermissionHelper
-import com.toolsku.app.overlay.BlockerOverlayService
 import kotlinx.coroutines.launch
 
 class CleanerActivity : AppCompatActivity() {
@@ -38,8 +35,7 @@ class CleanerActivity : AppCompatActivity() {
     private var isProcessing = false
 
     companion object {
-        /** Minimal cache size untuk ditampilkan: 10 MB */
-        private const val MIN_CACHE_SIZE = 10 * 1024 * 1024L
+        private const val MIN_CACHE_SIZE = 10 * 1024 * 1024L  // 10 MB
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -203,17 +199,19 @@ class CleanerActivity : AppCompatActivity() {
         isProcessing = true
         updateButtonCount()
 
+        val service = AutomationAccessibilityService.instance ?: return
+
         // Setup stop callback
-        BlockerOverlayService.onStopClick = {
-            AutomationAccessibilityService.instance?.cancelQueue()
-            hideOverlay()
+        AutomationAccessibilityService.onStopClick = {
+            service.cancelQueue()
+            service.hideOverlay()
             isProcessing = false
             updateButtonCount()
             Toast.makeText(this, "Dibatalkan", Toast.LENGTH_SHORT).show()
         }
 
-        // Show overlay
-        showOverlay(0, apps.size, "", BlockerOverlayService.MODE_CLEANER)
+        // ⭐ Tampilkan overlay via Accessibility Service (bukan Service terpisah)
+        service.showOverlay(0, apps.size, "", AutomationAccessibilityService.MODE_CLEANER)
 
         val tasks = apps.map { app ->
             val steps = mutableListOf<ActionStep>()
@@ -233,16 +231,15 @@ class CleanerActivity : AppCompatActivity() {
             AutomationTask(app.packageName, steps)
         }
 
-        val service = AutomationAccessibilityService.instance ?: return
         service.runQueue(
             tasks = tasks,
             onProgress = { current, total, pkg ->
-                updateOverlay(current, total, pkg)
+                service.updateOverlay(current, total, pkg)
             },
             onComplete = { stats ->
                 runOnUiThread {
-                    hideOverlay()
-                    BlockerOverlayService.onStopClick = null
+                    service.hideOverlay()
+                    AutomationAccessibilityService.onStopClick = null
                     isProcessing = false
                     updateButtonCount()
                     loadApps()
@@ -254,37 +251,5 @@ class CleanerActivity : AppCompatActivity() {
                 }
             }
         )
-    }
-
-    // ==== OVERLAY ====
-
-    private fun showOverlay(current: Int, total: Int, appName: String, mode: String) {
-        if (!PermissionHelper.canDrawOverlays(this)) return
-        val intent = Intent(this, BlockerOverlayService::class.java).apply {
-            action = BlockerOverlayService.ACTION_SHOW
-            putExtra(BlockerOverlayService.EXTRA_CURRENT, current)
-            putExtra(BlockerOverlayService.EXTRA_TOTAL, total)
-            putExtra(BlockerOverlayService.EXTRA_APP_NAME, appName)
-            putExtra(BlockerOverlayService.EXTRA_MODE, mode)
-        }
-        ContextCompat.startForegroundService(this, intent)  // ← foreground service
-    }
-
-    private fun updateOverlay(current: Int, total: Int, appName: String) {
-        if (!PermissionHelper.canDrawOverlays(this)) return
-        val intent = Intent(this, BlockerOverlayService::class.java).apply {
-            action = BlockerOverlayService.ACTION_UPDATE
-            putExtra(BlockerOverlayService.EXTRA_CURRENT, current)
-            putExtra(BlockerOverlayService.EXTRA_TOTAL, total)
-            putExtra(BlockerOverlayService.EXTRA_APP_NAME, appName)
-        }
-        startService(intent)
-    }
-
-    private fun hideOverlay() {
-        val intent = Intent(this, BlockerOverlayService::class.java).apply {
-            action = BlockerOverlayService.ACTION_HIDE
-        }
-        startService(intent)
     }
 }
