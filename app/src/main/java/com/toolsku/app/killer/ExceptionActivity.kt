@@ -1,6 +1,5 @@
 package com.toolsku.app.killer
 
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageButton
@@ -12,11 +11,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.toolsku.app.R
-import com.toolsku.app.core.AppInfo
+import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.Prefs
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class ExceptionActivity : AppCompatActivity() {
 
@@ -52,34 +49,15 @@ class ExceptionActivity : AppCompatActivity() {
         loadExceptions()
     }
 
+    override fun onResume() {
+        super.onResume()
+        loadExceptions()
+    }
+
     private fun loadExceptions() {
         lifecycleScope.launch {
-            val exceptionPackages = Prefs.exceptionList
-
-            if (exceptionPackages.isEmpty()) {
-                adapter.submitList(emptyList())
-                tvEmpty.visibility = View.VISIBLE
-                return@launch
-            }
-
-            // AMBIL LANGSUNG per-package (cepat!)
-            val apps = withContext(Dispatchers.IO) {
-                val pm = packageManager
-                exceptionPackages.mapNotNull { pkg ->
-                    try {
-                        val appInfo = pm.getApplicationInfo(pkg, 0)
-                        AppInfo(
-                            packageName = pkg,
-                            label = pm.getApplicationLabel(appInfo).toString(),
-                            icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
-                            isSystem = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0,
-                            isException = true
-                        )
-                    } catch (e: PackageManager.NameNotFoundException) {
-                        null  // App sudah di-uninstall
-                    }
-                }.sortedBy { it.label.lowercase() }
-            }
+            // Pakai method khusus: cari LANGSUNG per package
+            val apps = AppRepository.getExceptionApps(this@ExceptionActivity)
 
             adapter.submitList(apps)
 
