@@ -120,6 +120,7 @@
     <string name="cleaner_title">Bersihkan Cache</string>
     <string name="cleaner_header">Clear Cache</string>
     <string name="cleaner_clear_all">Bersihkan Semua (%1$d)</string>
+    <string name="cleaner_clear_all_zero">BERSIHKAN SEMUA</string>
     <string name="cleaner_cache_label">Cache</string>
     <string name="cleaner_total_cache">Total Cache</string>
     <string name="cleaner_loading">Memuat aplikasi…</string>
