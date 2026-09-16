@@ -13,9 +13,6 @@ data class CleanerAppItem(
     val isSystem: Boolean,
     var selected: Boolean = true
 ) {
-    /**
-     * Format cache size.
-     */
     fun formatCacheSize(): String {
         return when {
             cacheSize < 1024 -> "$cacheSize B"
