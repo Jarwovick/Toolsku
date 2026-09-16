@@ -35,7 +35,8 @@ class CleanerActivity : AppCompatActivity() {
     private var isProcessing = false
 
     companion object {
-        private const val MIN_CACHE_SIZE = 10 * 1024 * 1024L  // 10 MB
+        /** Minimal cache size untuk ditampilkan: 10 MB */
+        private const val MIN_CACHE_SIZE = 10 * 1024 * 1024L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -210,7 +211,7 @@ class CleanerActivity : AppCompatActivity() {
             Toast.makeText(this, "Dibatalkan", Toast.LENGTH_SHORT).show()
         }
 
-        // ⭐ Tampilkan overlay via Accessibility Service (bukan Service terpisah)
+        // Show overlay (via Accessibility Service)
         service.showOverlay(0, apps.size, "", AutomationAccessibilityService.MODE_CLEANER)
 
         val tasks = apps.map { app ->
@@ -228,13 +229,14 @@ class CleanerActivity : AppCompatActivity() {
             steps.add(ActionStep.Wait(200))
             steps.add(ActionStep.Back)
             steps.add(ActionStep.Wait(200))
-            AutomationTask(app.packageName, steps)
+            // Pass appLabel untuk overlay
+            AutomationTask(app.packageName, app.label, steps)
         }
 
         service.runQueue(
             tasks = tasks,
-            onProgress = { current, total, pkg ->
-                service.updateOverlay(current, total, pkg)
+            onProgress = { current, total, appLabel ->
+                service.updateOverlay(current, total, appLabel)
             },
             onComplete = { stats ->
                 runOnUiThread {
