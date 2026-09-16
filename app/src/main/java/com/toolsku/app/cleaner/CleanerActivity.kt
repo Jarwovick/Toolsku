@@ -37,6 +37,11 @@ class CleanerActivity : AppCompatActivity() {
 
     private var isProcessing = false
 
+    companion object {
+        /** Minimal cache size untuk ditampilkan: 10 MB */
+        private const val MIN_CACHE_SIZE = 10 * 1024 * 1024L
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_cleaner)
@@ -110,15 +115,23 @@ class CleanerActivity : AppCompatActivity() {
                         isSystem = app.isSystem,
                         selected = true
                     )
-                }.sortedByDescending { it.cacheSize }
+                }
+                    .filter { it.cacheSize >= MIN_CACHE_SIZE }
+                    .sortedByDescending { it.cacheSize }
 
                 adapter.submitList(items)
                 updateTotals(items)
                 updateSelectAllIcon()
                 updateButtonCount()
 
-                tvLoading.visibility = View.GONE
+                if (items.isEmpty()) {
+                    tvLoading.visibility = View.VISIBLE
+                    tvLoading.text = "Tidak ada cache ≥ 10 MB"
+                } else {
+                    tvLoading.visibility = View.GONE
+                }
             } catch (e: Exception) {
+                tvLoading.visibility = View.VISIBLE
                 tvLoading.text = "Error: ${e.message}"
             }
         }
@@ -199,7 +212,7 @@ class CleanerActivity : AppCompatActivity() {
             Toast.makeText(this, "Dibatalkan", Toast.LENGTH_SHORT).show()
         }
 
-        // Show overlay dengan mode CLEANER
+        // Show overlay
         showOverlay(0, apps.size, "", BlockerOverlayService.MODE_CLEANER)
 
         val tasks = apps.map { app ->
@@ -254,7 +267,7 @@ class CleanerActivity : AppCompatActivity() {
             putExtra(BlockerOverlayService.EXTRA_APP_NAME, appName)
             putExtra(BlockerOverlayService.EXTRA_MODE, mode)
         }
-        startService(intent)
+        ContextCompat.startForegroundService(this, intent)  // ← foreground service
     }
 
     private fun updateOverlay(current: Int, total: Int, appName: String) {
