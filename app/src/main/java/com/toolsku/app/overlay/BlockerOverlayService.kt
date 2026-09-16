@@ -34,17 +34,10 @@ class BlockerOverlayService : Service() {
         const val EXTRA_CURRENT = "current"
         const val EXTRA_TOTAL = "total"
         const val EXTRA_APP_NAME = "app_name"
-        const val EXTRA_TITLE = "title"
-        const val EXTRA_SUBTITLE = "subtitle"
+        const val EXTRA_MODE = "mode"
 
-        /**
-         * Mode overlay:
-         * - MODE_KILLER: "CLOSING APPS" / "SHUTTING DOWN"
-         * - MODE_CLEANER: "CLEANING…" / "REMOVING CACHE"
-         */
         const val MODE_KILLER = "killer"
         const val MODE_CLEANER = "cleaner"
-        const val EXTRA_MODE = "mode"
 
         var onStopClick: (() -> Unit)? = null
 
