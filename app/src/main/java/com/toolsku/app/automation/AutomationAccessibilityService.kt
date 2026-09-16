@@ -1,6 +1,8 @@
 package com.toolsku.app.automation
 
 import android.accessibilityservice.AccessibilityService
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 
@@ -15,6 +17,7 @@ class AutomationAccessibilityService : AccessibilityService() {
     }
 
     private lateinit var executor: TaskExecutor
+    private val handler = Handler(Looper.getMainLooper())
     private var isRunning = false
 
     override fun onServiceConnected() {
@@ -51,7 +54,6 @@ class AutomationAccessibilityService : AccessibilityService() {
 
     /**
      * Jalankan queue otomasi.
-     * Dipanggil dari Activity (mis. KillerActivity).
      */
     fun runQueue(
         tasks: List<AutomationTask>,
@@ -65,10 +67,8 @@ class AutomationAccessibilityService : AccessibilityService() {
 
         isRunning = true
         TaskQueue.start(tasks)
-
         TaskQueue.onProgress = onProgress
 
-        // Proses task berikutnya
         processNextTask(onComplete)
 
         return true
@@ -88,13 +88,17 @@ class AutomationAccessibilityService : AccessibilityService() {
         executor.execute(task) { result ->
             TaskQueue.completeCurrent(result)
             // Delay kecil antar task
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            handler.postDelayed({
                 processNextTask(onComplete)
-            }, 500)
+            }, 300)
         }
     }
 
+    /**
+     * Batalkan queue yang sedang berjalan.
+     */
     fun cancelQueue() {
+        Log.i(TAG, "Cancel queue requested")
         TaskQueue.cancelAll()
         isRunning = false
         executor.cleanup()
