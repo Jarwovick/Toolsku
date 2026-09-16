@@ -84,9 +84,7 @@ class AutomationAccessibilityService : AccessibilityService() {
     /**
      * Jalankan queue otomasi.
      *
-     * @param tasks Daftar AutomationTask
      * @param onProgress Callback: (current, total, appLabel)
-     * @param onComplete Callback: (QueueStats)
      */
     fun runQueue(
         tasks: List<AutomationTask>,
@@ -101,9 +99,7 @@ class AutomationAccessibilityService : AccessibilityService() {
         isRunning = true
         TaskQueue.start(tasks)
 
-        // TaskQueue.onProgress punya signature:
-        // (current, total, packageName, appLabel)
-        // Kita wrap ke (current, total, appLabel)
+        // Wrap: skip packageName, pakai appLabel
         TaskQueue.onProgress = { current, total, _, appLabel ->
             onProgress?.invoke(current, total, appLabel)
         }
