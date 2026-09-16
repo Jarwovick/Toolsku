@@ -13,44 +13,13 @@ object AppRepository {
 
     private const val TAG = "AppRepo"
 
-    /**
-     * Cache hasil kill: pkg -> timestamp.
-     * App yang baru di-kill akan disembunyikan dari daftar selama 30 detik.
-     */
-    private val recentlyKilled = mutableMapOf<String, Long>()
-    private const val RECENTLY_KILLED_TTL_MS = 30_000L  // 30 detik
+    // Threshold "running" — 1 menit terakhir
+    private const val RUNNING_THRESHOLD_MS = 60 * 1000L
 
     /**
-     * Tandai app sebagai "baru di-kill".
-     * App akan disembunyikan dari daftar selama 30 detik.
+     * Ambil daftar SEMUA app terinstall (user + system).
+     * Untuk Cleaner.
      */
-    fun markAsKilled(pkg: String) {
-        recentlyKilled[pkg] = System.currentTimeMillis()
-        Log.d(TAG, "Marked as killed: $pkg")
-    }
-
-    /**
-     * Cek apakah app masih "baru di-kill".
-     */
-    private fun isRecentlyKilled(pkg: String): Boolean {
-        val timestamp = recentlyKilled[pkg] ?: return false
-        val elapsed = System.currentTimeMillis() - timestamp
-        if (elapsed > RECENTLY_KILLED_TTL_MS) {
-            recentlyKilled.remove(pkg)
-            return false
-        }
-        return true
-    }
-
-    /**
-     * Bersihkan cache recentlyKilled.
-     */
-    fun clearKilledCache() {
-        recentlyKilled.clear()
-    }
-
-    // ==== GET APPS ====
-
     suspend fun getInstalledApps(context: Context, includeSystem: Boolean = false): List<AppInfo> =
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
@@ -81,38 +50,87 @@ object AppRepository {
             result
         }
 
+    /**
+     * Ambil daftar SEMUA app yang ada di exception list.
+     * Cari LANGSUNG per package (tanpa filter).
+     */
+    suspend fun getExceptionApps(context: Context): List<AppInfo> =
+        withContext(Dispatchers.IO) {
+            val pm = context.packageManager
+            val exceptionPackages = Prefs.exceptionList
+            val result = mutableListOf<AppInfo>()
+
+            for (pkg in exceptionPackages) {
+                try {
+                    val appInfo = pm.getApplicationInfo(pkg, 0)
+                    val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+
+                    result.add(
+                        AppInfo(
+                            packageName = pkg,
+                            label = pm.getApplicationLabel(appInfo).toString(),
+                            icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
+                            isSystem = isSystem,
+                            isException = true
+                        )
+                    )
+                } catch (e: PackageManager.NameNotFoundException) {
+                    // App sudah di-uninstall — skip
+                    Log.w(TAG, "Exception app not found: $pkg")
+                }
+            }
+
+            result.sortBy { it.label.lowercase() }
+            result
+        }
+
+    /**
+     * Ambil daftar SEMUA app terinstall (untuk dialog SELECT APPS).
+     * Termasuk system apps.
+     */
+    suspend fun getAllApps(context: Context, onlyUser: Boolean = false): List<AppInfo> =
+        withContext(Dispatchers.IO) {
+            val pm = context.packageManager
+            val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            val result = mutableListOf<AppInfo>()
+            val ourPackage = context.packageName
+
+            for (app in packages) {
+                if (app.packageName == ourPackage) continue
+                if (SystemApps.isDangerousSystemApp(app.packageName)) continue
+
+                val isSystem = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                if (onlyUser && isSystem) continue
+
+                result.add(
+                    AppInfo(
+                        packageName = app.packageName,
+                        label = pm.getApplicationLabel(app).toString(),
+                        icon = try { pm.getApplicationIcon(app) } catch (e: Exception) { null },
+                        isSystem = isSystem,
+                        isException = Prefs.isException(app.packageName)
+                    )
+                )
+            }
+
+            result.sortBy { it.label.lowercase() }
+            result
+        }
+
+    /**
+     * Ambil daftar system apps yang AMAN di-kill.
+     */
     suspend fun getSafeSystemApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
-            val ourPackage = context.packageName
-            val result = mutableListOf<AppInfo>()
-
-            val runningPackages = mutableSetOf<String>()
-            try {
-                val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-                val processes = am.runningAppProcesses
-                if (processes != null) {
-                    for (process in processes) {
-                        if (process.pkgList == null) continue
-                        process.pkgList.forEach { runningPackages.add(it) }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "getRunningAppProcesses failed", e)
-            }
-
-            val hasRunningInfo = runningPackages.size > 1
-
             val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            val result = mutableListOf<AppInfo>()
+            val ourPackage = context.packageName
+
             for (app in packages) {
                 if (app.packageName == ourPackage) continue
                 if (!SystemApps.isSafeSystemApp(app.packageName)) continue
                 if (Prefs.isException(app.packageName)) continue
-                if (isRecentlyKilled(app.packageName)) continue  // ⭐ Skip yang baru di-kill
-
-                if (hasRunningInfo && !runningPackages.contains(app.packageName)) {
-                    continue
-                }
 
                 result.add(
                     AppInfo(
@@ -129,82 +147,76 @@ object AppRepository {
             result
         }
 
+    /**
+     * Ambil daftar app RUNNING (akurat).
+     *
+     * Strategi:
+     * 1. getRunningAppProcesses() — akurat untuk app foreground
+     * 2. UsageStatsManager (1 menit) — untuk app yang baru dipakai
+     * 3. Gabungkan, hilangkan duplikat
+     */
     suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
-        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val pm = context.packageManager
         val ourPackage = context.packageName
-        val result = mutableListOf<AppInfo>()
-        val seen = mutableSetOf<String>()
+        val runningPackages = mutableSetOf<String>()
 
-        val runningProcesses = try {
-            am.runningAppProcesses
-        } catch (e: Exception) {
-            null
-        }
-
-        if (runningProcesses != null && runningProcesses.size > 1) {
-            for (process in runningProcesses) {
-                if (process.pkgList == null) continue
-                val pkg = process.pkgList.firstOrNull() ?: process.processName ?: continue
-
-                if (pkg == ourPackage) continue
-                if (seen.contains(pkg)) continue
-                if (SystemApps.isDangerousSystemApp(pkg)) continue
-                if (SystemApps.isSystemApp(pkg)) continue
-                if (Prefs.isException(pkg)) continue
-                if (isRecentlyKilled(pkg)) continue  // ⭐ Skip yang baru di-kill
-
-                try {
-                    val appInfo = pm.getApplicationInfo(pkg, 0)
-                    val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                    if (isSystem) continue
-
-                    seen.add(pkg)
-                    result.add(
-                        AppInfo(
-                            packageName = pkg,
-                            label = pm.getApplicationLabel(appInfo).toString(),
-                            icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
-                            isSystem = false,
-                            isException = false
-                        )
-                    )
-                } catch (e: Exception) {
-                    // Skip
+        // === 1. getRunningAppProcesses ===
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val processes = am.runningAppProcesses
+            if (processes != null) {
+                for (process in processes) {
+                    if (process.pkgList == null) continue
+                    val pkg = process.pkgList.firstOrNull() ?: process.processName ?: continue
+                    if (pkg != ourPackage) {
+                        runningPackages.add(pkg)
+                    }
                 }
             }
-            return@withContext result.sortedBy { it.label.lowercase() }
+            Log.d(TAG, "getRunningAppProcesses: ${runningPackages.size} found")
+        } catch (e: Exception) {
+            Log.e(TAG, "getRunningAppProcesses failed", e)
         }
 
-        // Fallback UsageStats 5 menit
-        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val endTime = System.currentTimeMillis()
-        val beginTime = endTime - (5 * 60 * 1000L)
+        // === 2. UsageStats (1 menit terakhir) ===
+        try {
+            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val endTime = System.currentTimeMillis()
+            val beginTime = endTime - RUNNING_THRESHOLD_MS
 
-        val usageStats = try {
-            usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, beginTime, endTime)
+            val usageStats = usm.queryUsageStats(
+                UsageStatsManager.INTERVAL_DAILY,
+                beginTime,
+                endTime
+            )
+            if (usageStats != null) {
+                for (stat in usageStats) {
+                    val pkg = stat.packageName ?: continue
+                    val timeSinceLastUse = endTime - stat.lastTimeUsed
+                    if (timeSinceLastUse <= RUNNING_THRESHOLD_MS && pkg != ourPackage) {
+                        runningPackages.add(pkg)
+                    }
+                }
+            }
+            Log.d(TAG, "After UsageStats: ${runningPackages.size} found")
         } catch (e: Exception) {
-            null
-        } ?: return@withContext emptyList()
+            Log.e(TAG, "UsageStats failed", e)
+        }
 
-        for (stat in usageStats) {
-            val pkg = stat.packageName ?: continue
+        // === 3. Filter & convert ===
+        val result = mutableListOf<AppInfo>()
+        for (pkg in runningPackages) {
             if (pkg == ourPackage) continue
-            if (seen.contains(pkg)) continue
             if (SystemApps.isDangerousSystemApp(pkg)) continue
-            if (SystemApps.isSystemApp(pkg)) continue
             if (Prefs.isException(pkg)) continue
-            if (isRecentlyKilled(pkg)) continue  // ⭐ Skip yang baru di-kill
 
             try {
                 val appInfo = pm.getApplicationInfo(pkg, 0)
                 val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+
+                // Skip system apps — user apps saja
                 if (isSystem) continue
 
-                val timeSinceLastUse = endTime - stat.lastTimeUsed
-                if (timeSinceLastUse > 5 * 60 * 1000L) continue
-
-                seen.add(pkg)
                 result.add(
                     AppInfo(
                         packageName = pkg,
@@ -220,14 +232,17 @@ object AppRepository {
         }
 
         result.sortBy { it.label.lowercase() }
+        Log.i(TAG, "Final running apps: ${result.size}")
         result
     }
 
+    /**
+     * Kill app pakai killBackgroundProcesses().
+     */
     fun killWithBackgroundProcesses(context: Context, packageName: String): Boolean {
         return try {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
             am.killBackgroundProcesses(packageName)
-            markAsKilled(packageName)  // ⭐ Tandai
             true
         } catch (e: Exception) {
             false
