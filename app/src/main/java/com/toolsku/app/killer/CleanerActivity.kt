@@ -18,7 +18,6 @@ import com.toolsku.app.automation.ActionStep
 import com.toolsku.app.automation.AutomationAccessibilityService
 import com.toolsku.app.automation.AutomationTask
 import com.toolsku.app.automation.OemProfile
-import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.CacheSizeFetcher
 import kotlinx.coroutines.launch
@@ -81,34 +80,38 @@ class CleanerActivity : AppCompatActivity() {
         tvLoading.text = getString(R.string.cleaner_loading)
 
         lifecycleScope.launch {
-            // Ambil user apps + safe system apps
-            val userApps = AppRepository.getInstalledApps(this@CleanerActivity, includeSystem = false)
-            val systemApps = AppRepository.getSafeSystemApps(this@CleanerActivity)
-            val allApps = (userApps + systemApps).distinctBy { it.packageName }
+            try {
+                // Ambil user apps + safe system apps
+                val userApps = AppRepository.getInstalledApps(this@CleanerActivity, includeSystem = false)
+                val systemApps = AppRepository.getSafeSystemApps(this@CleanerActivity)
+                val allApps = (userApps + systemApps).distinctBy { it.packageName }
 
-            // Ambil cache size per app
-            val cacheSizes = CacheSizeFetcher.getCacheSizes(
-                this@CleanerActivity,
-                allApps.map { it.packageName }
-            )
-
-            val items = allApps.map { app ->
-                CleanerAppItem(
-                    packageName = app.packageName,
-                    label = app.label,
-                    icon = app.icon,
-                    cacheSize = cacheSizes[app.packageName] ?: 0L,
-                    isSystem = app.isSystem,
-                    selected = true
+                // Ambil cache size per app
+                val cacheSizes = CacheSizeFetcher.getCacheSizes(
+                    this@CleanerActivity,
+                    allApps.map { it.packageName }
                 )
-            }.sortedByDescending { it.cacheSize }  // Sortir dari terbesar
 
-            adapter.submitList(items)
-            updateTotals(items)
-            updateSelectAllIcon()
-            updateButtonCount()
+                val items = allApps.map { app ->
+                    CleanerAppItem(
+                        packageName = app.packageName,
+                        label = app.label,
+                        icon = app.icon,
+                        cacheSize = cacheSizes[app.packageName] ?: 0L,
+                        isSystem = app.isSystem,
+                        selected = true
+                    )
+                }.sortedByDescending { it.cacheSize }
 
-            tvLoading.visibility = View.GONE
+                adapter.submitList(items)
+                updateTotals(items)
+                updateSelectAllIcon()
+                updateButtonCount()
+
+                tvLoading.visibility = View.GONE
+            } catch (e: Exception) {
+                tvLoading.text = "Error: ${e.message}"
+            }
         }
     }
 
@@ -179,21 +182,21 @@ class CleanerActivity : AppCompatActivity() {
         val tasks = apps.map { app ->
             val steps = mutableListOf<ActionStep>()
             steps.add(ActionStep.OpenAppInfo(app.packageName))
-            steps.add(ActionStep.Wait(300))
+            steps.add(ActionStep.Wait(400))
             // Klik "Penyimpanan & cache"
             steps.add(ActionStep.ClickByText(OemProfile.storageMenuLabels))
-            steps.add(ActionStep.Wait(300))
+            steps.add(ActionStep.Wait(400))
             // Klik "Hapus cache"
             steps.add(ActionStep.ClickByTextSafe(
                 OemProfile.clearCacheLabels,
                 OemProfile.clearDataLabels
             ))
-            steps.add(ActionStep.Wait(300))
+            steps.add(ActionStep.Wait(400))
             // Back 2x
             steps.add(ActionStep.Back)
-            steps.add(ActionStep.Wait(150))
+            steps.add(ActionStep.Wait(200))
             steps.add(ActionStep.Back)
-            steps.add(ActionStep.Wait(150))
+            steps.add(ActionStep.Wait(200))
             AutomationTask(app.packageName, steps)
         }
 
@@ -208,7 +211,7 @@ class CleanerActivity : AppCompatActivity() {
                     loadApps()
                     Toast.makeText(
                         this,
-                        "Selesai: ${stats.success} sukses",
+                        "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
                         Toast.LENGTH_LONG
                     ).show()
                 }
