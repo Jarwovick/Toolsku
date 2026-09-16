@@ -1,6 +1,7 @@
 package com.toolsku.app.killer
 
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.ImageButton
 import android.widget.TextView
@@ -16,6 +17,10 @@ import com.toolsku.app.core.Prefs
 import kotlinx.coroutines.launch
 
 class ExceptionActivity : AppCompatActivity() {
+
+    companion object {
+        private const val TAG = "ToolskuException"
+    }
 
     private lateinit var adapter: ExceptionAdapter
     private lateinit var tvEmpty: TextView
@@ -49,15 +54,13 @@ class ExceptionActivity : AppCompatActivity() {
         loadExceptions()
     }
 
-    override fun onResume() {
-        super.onResume()
-        loadExceptions()
-    }
-
     private fun loadExceptions() {
         lifecycleScope.launch {
-            // Pakai method khusus: cari LANGSUNG per package
+            val exceptionPackages = Prefs.exceptionList
+            Log.i(TAG, "Prefs.exceptionList: ${exceptionPackages.size} — $exceptionPackages")
+
             val apps = AppRepository.getExceptionApps(this@ExceptionActivity)
+            Log.i(TAG, "Loaded exception apps: ${apps.size}")
 
             adapter.submitList(apps)
 
@@ -78,15 +81,22 @@ class ExceptionActivity : AppCompatActivity() {
     private fun showSelectAppsDialog() {
         val dialog = SelectAppsDialog()
         dialog.setOnSelectionComplete { selected ->
+            Log.i(TAG, "Selected: ${selected.size}")
+
             val current = Prefs.exceptionList.toMutableSet()
+            Log.i(TAG, "Before: ${current.size}")
             current.addAll(selected)
             Prefs.exceptionList = current
 
+            val verify = Prefs.exceptionList
+            Log.i(TAG, "After: ${verify.size} — $verify")
+
             Toast.makeText(
                 this,
-                "${selected.size} app ditambahkan",
-                Toast.LENGTH_SHORT
+                "${selected.size} app ditambahkan (total: ${verify.size})",
+                Toast.LENGTH_LONG
             ).show()
+
             loadExceptions()
         }
         dialog.show(supportFragmentManager, "SelectAppsDialog")
