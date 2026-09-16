@@ -19,8 +19,8 @@ import android.widget.TextView
 import com.toolsku.app.R
 
 /**
- * Service yang menampilkan overlay "CLOSING APPS" full-screen.
- * Menampilkan progress saat kill berjalan.
+ * Service yang menampilkan overlay full-screen saat otomasi berjalan.
+ * Dipakai oleh Killer ("CLOSING APPS") dan Cleaner ("CLEANING…").
  */
 class BlockerOverlayService : Service() {
 
@@ -34,11 +34,18 @@ class BlockerOverlayService : Service() {
         const val EXTRA_CURRENT = "current"
         const val EXTRA_TOTAL = "total"
         const val EXTRA_APP_NAME = "app_name"
+        const val EXTRA_TITLE = "title"
+        const val EXTRA_SUBTITLE = "subtitle"
 
         /**
-         * Callback statis untuk tombol stop.
-         * Di-set oleh KillerActivity.
+         * Mode overlay:
+         * - MODE_KILLER: "CLOSING APPS" / "SHUTTING DOWN"
+         * - MODE_CLEANER: "CLEANING…" / "REMOVING CACHE"
          */
+        const val MODE_KILLER = "killer"
+        const val MODE_CLEANER = "cleaner"
+        const val EXTRA_MODE = "mode"
+
         var onStopClick: (() -> Unit)? = null
 
         @Volatile
@@ -51,6 +58,8 @@ class BlockerOverlayService : Service() {
     private lateinit var progressBar: ProgressBar
     private lateinit var tvPercent: TextView
     private lateinit var tvAppName: TextView
+    private lateinit var tvTitle: TextView
+    private lateinit var tvSubtitle: TextView
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -65,7 +74,8 @@ class BlockerOverlayService : Service() {
                 val current = intent.getIntExtra(EXTRA_CURRENT, 0)
                 val total = intent.getIntExtra(EXTRA_TOTAL, 1)
                 val appName = intent.getStringExtra(EXTRA_APP_NAME) ?: ""
-                showOverlay(current, total, appName)
+                val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_KILLER
+                showOverlay(current, total, appName, mode)
             }
             ACTION_UPDATE -> {
                 val current = intent.getIntExtra(EXTRA_CURRENT, 0)
@@ -88,7 +98,7 @@ class BlockerOverlayService : Service() {
         super.onDestroy()
     }
 
-    private fun showOverlay(current: Int, total: Int, appName: String) {
+    private fun showOverlay(current: Int, total: Int, appName: String, mode: String) {
         if (overlayView != null) {
             updateOverlay(current, total, appName)
             return
@@ -102,8 +112,19 @@ class BlockerOverlayService : Service() {
             progressBar = overlayView!!.findViewById(R.id.progressBar)
             tvPercent = overlayView!!.findViewById(R.id.tvPercent)
             tvAppName = overlayView!!.findViewById(R.id.tvAppName)
+            tvTitle = overlayView!!.findViewById(R.id.tvTitle)
+            tvSubtitle = overlayView!!.findViewById(R.id.tvSubtitle)
 
-            // Setup stop button
+            // Set judul & subtitle sesuai mode
+            if (mode == MODE_CLEANER) {
+                tvTitle.text = getString(R.string.overlay_cleaning_title)
+                tvSubtitle.text = getString(R.string.overlay_cleaning_subtitle)
+            } else {
+                tvTitle.text = getString(R.string.overlay_closing_apps)
+                tvSubtitle.text = getString(R.string.overlay_shutting_down)
+            }
+
+            // Tombol stop
             overlayView!!.findViewById<FrameLayout>(R.id.btnStop).setOnClickListener {
                 onStopClick?.invoke()
             }
@@ -133,7 +154,7 @@ class BlockerOverlayService : Service() {
 
             updateOverlay(current, total, appName)
 
-            Log.i(TAG, "Overlay shown")
+            Log.i(TAG, "Overlay shown (mode=$mode)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show overlay", e)
         }
