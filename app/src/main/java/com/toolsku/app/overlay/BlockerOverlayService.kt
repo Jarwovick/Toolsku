@@ -1,5 +1,9 @@
 package com.toolsku.app.overlay
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -16,8 +20,14 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.core.app.NotificationCompat
+import com.toolsku.app.MainActivity
 import com.toolsku.app.R
 
+/**
+ * Foreground service yang menampilkan overlay full-screen saat otomasi berjalan.
+ * Foreground service dipakai supaya overlay tetap muncul di atas Settings/App Info.
+ */
 class BlockerOverlayService : Service() {
 
     companion object {
@@ -34,6 +44,9 @@ class BlockerOverlayService : Service() {
 
         const val MODE_KILLER = "killer"
         const val MODE_CLEANER = "cleaner"
+
+        private const val CHANNEL_ID = "toolsku_overlay"
+        private const val NOTIFICATION_ID = 2001
 
         var onStopClick: (() -> Unit)? = null
 
@@ -57,9 +70,13 @@ class BlockerOverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Mulai foreground service DULU — supaya tidak di-kill
+        startForeground(NOTIFICATION_ID, buildNotification())
+
         when (intent?.action) {
             ACTION_SHOW -> {
                 val current = intent.getIntExtra(EXTRA_CURRENT, 0)
@@ -84,6 +101,12 @@ class BlockerOverlayService : Service() {
             }
             ACTION_HIDE -> {
                 hideOverlay()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
                 stopSelf()
             }
         }
@@ -96,6 +119,47 @@ class BlockerOverlayService : Service() {
         hideOverlay()
         super.onDestroy()
     }
+
+    // ==== NOTIFICATION ====
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                getString(R.string.overlay_channel_name),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = getString(R.string.overlay_channel_desc)
+                setShowBadge(false)
+                setSound(null, null)
+                enableVibration(false)
+            }
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun buildNotification(): Notification {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(getString(R.string.overlay_notification_title))
+            .setContentText(getString(R.string.overlay_notification_text))
+            .setSmallIcon(R.drawable.ic_dimmer)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
+            .build()
+    }
+
+    // ==== OVERLAY ====
 
     private fun showOverlay(current: Int, total: Int, appName: String, mode: String) {
         if (overlayView != null) {
@@ -133,7 +197,6 @@ class BlockerOverlayService : Service() {
                 WindowManager.LayoutParams.TYPE_PHONE
             }
 
-            // Flag digabung pakai `or` di AKHIR baris
             val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
