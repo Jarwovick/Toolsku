@@ -62,13 +62,21 @@ class ExceptionActivity : AppCompatActivity() {
     private fun loadExceptions() {
         lifecycleScope.launch {
             val exceptionPackages = Prefs.exceptionList
-            val installedApps = AppRepository.getInstalledApps(
+
+            // Ambil user apps + system apps (gabung, distinct)
+            val userApps = AppRepository.getInstalledApps(
+                this@ExceptionActivity,
+                includeSystem = false
+            )
+            val systemApps = AppRepository.getInstalledApps(
                 this@ExceptionActivity,
                 includeSystem = true
             )
-            val exceptionApps = installedApps.filter {
+            val allApps = (userApps + systemApps).distinctBy { it.packageName }
+
+            val exceptionApps = allApps.filter {
                 exceptionPackages.contains(it.packageName)
-            }
+            }.sortedBy { it.label.lowercase() }
 
             adapter.submitList(exceptionApps)
 
