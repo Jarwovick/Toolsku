@@ -31,11 +31,8 @@ import kotlinx.coroutines.launch
 
 class KillerActivity : AppCompatActivity() {
 
-    enum class FilterType { USER_APPS, SYSTEM_APPS }
-
     private lateinit var adapter: KillerAdapter
     private lateinit var tvHeaderTitle: TextView
-    private lateinit var tvFilterLabel: TextView
     private lateinit var btnSelectAll: ImageButton
     private lateinit var btnRefresh: ImageButton
     private lateinit var btnCloseApps: Button
@@ -49,7 +46,6 @@ class KillerActivity : AppCompatActivity() {
 
     private var allSelected = true
     private var isProcessing = false
-    private var currentFilter = FilterType.USER_APPS
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,7 +53,6 @@ class KillerActivity : AppCompatActivity() {
         title = getString(R.string.killer_title)
 
         tvHeaderTitle = findViewById(R.id.tvHeaderTitle)
-        tvFilterLabel = findViewById(R.id.tvFilterLabel)
         btnSelectAll = findViewById(R.id.btnSelectAll)
         btnRefresh = findViewById(R.id.btnRefresh)
         btnCloseApps = findViewById(R.id.btnCloseApps)
@@ -70,7 +65,6 @@ class KillerActivity : AppCompatActivity() {
         tvLoading = findViewById(R.id.tvLoading)
 
         tvHeaderTitle.text = getString(R.string.header_kill_apps_running)
-        tvFilterLabel.text = getString(R.string.killer_filter_user_apps)
 
         adapter = KillerAdapter(
             onItemClick = { updateButtonCount() },
@@ -79,10 +73,6 @@ class KillerActivity : AppCompatActivity() {
         findViewById<RecyclerView>(R.id.rvApps).apply {
             layoutManager = LinearLayoutManager(this@KillerActivity)
             adapter = this@KillerActivity.adapter
-        }
-
-        findViewById<android.widget.LinearLayout>(R.id.btnFilter).setOnClickListener {
-            showFilterMenu()
         }
 
         btnRefresh.setOnClickListener {
@@ -127,19 +117,28 @@ class KillerActivity : AppCompatActivity() {
         tvLoading.text = getString(R.string.killer_loading)
 
         lifecycleScope.launch {
-            val apps = when (currentFilter) {
-                FilterType.USER_APPS -> AppRepository.getRunningApps(this@KillerActivity)
-                FilterType.SYSTEM_APPS -> AppRepository.getSafeSystemApps(this@KillerActivity)
-            }.map { it.toKillerItem() }
+            val userApps = AppRepository.getRunningApps(this@KillerActivity)
+            val systemApps = AppRepository.getSafeSystemApps(this@KillerActivity)
 
-            adapter.submitList(apps)
-            allSelected = apps.isNotEmpty()
+            // Gabung dengan section header
+            val combined = mutableListOf<KillerAppItem>()
+            if (userApps.isNotEmpty()) {
+                combined.add(KillerAppItem.section("USER APPS (${userApps.size})"))
+                combined.addAll(userApps.map { it.toKillerItem() })
+            }
+            if (systemApps.isNotEmpty()) {
+                combined.add(KillerAppItem.section("SYSTEM APPS (${systemApps.size})"))
+                combined.addAll(systemApps.map { it.toKillerItem() })
+            }
+
+            adapter.submitList(combined)
+            allSelected = true
             updateSelectAllIcon()
             updateButtonCount()
-            updateLaunchedAppsCount(apps.size)
+            updateLaunchedAppsCount(userApps.size + systemApps.size)
             updateRamInfo()
 
-            if (apps.isEmpty()) {
+            if (combined.isEmpty()) {
                 tvLoading.visibility = View.VISIBLE
                 tvLoading.text = getString(R.string.killer_no_apps)
             } else {
@@ -157,28 +156,6 @@ class KillerActivity : AppCompatActivity() {
             isException = this.isException,
             selected = true
         )
-    }
-
-    private fun showFilterMenu() {
-        val popup = PopupMenu(this, findViewById(R.id.btnFilter))
-        popup.menu.add(0, 0, 0, getString(R.string.killer_filter_user_apps))
-        popup.menu.add(0, 1, 1, getString(R.string.killer_filter_system_apps))
-        popup.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                0 -> {
-                    currentFilter = FilterType.USER_APPS
-                    tvFilterLabel.text = getString(R.string.killer_filter_user_apps)
-                    loadApps()
-                }
-                1 -> {
-                    currentFilter = FilterType.SYSTEM_APPS
-                    tvFilterLabel.text = getString(R.string.killer_filter_system_apps)
-                    loadApps()
-                }
-            }
-            true
-        }
-        popup.show()
     }
 
     // ==== RAM ====
@@ -207,7 +184,7 @@ class KillerActivity : AppCompatActivity() {
     // ==== UI ====
 
     private fun updateButtonCount() {
-        val count = adapter.getItems().count { it.selected }
+        val count = adapter.getAppItems().count { it.selected }
         btnCloseApps.text = if (count == 0) {
             getString(R.string.killer_close_apps_zero)
         } else {
@@ -282,7 +259,7 @@ class KillerActivity : AppCompatActivity() {
     // ==== KILL ====
 
     private fun startKilling() {
-        val selected = adapter.getItems().filter { it.selected }
+        val selected = adapter.getAppItems().filter { it.selected }
         if (selected.isEmpty()) {
             Toast.makeText(this, "Tidak ada aplikasi dipilih", Toast.LENGTH_SHORT).show()
             return
@@ -294,19 +271,12 @@ class KillerActivity : AppCompatActivity() {
             return
         }
 
-        // Kill langsung tanpa dialog (untuk system apps) atau dengan dialog (user apps)
-        if (currentFilter == FilterType.SYSTEM_APPS) {
-            // System apps: langsung kill tanpa dialog
-            executeKill(selected)
-        } else {
-            // User apps: dengan dialog konfirmasi
-            AlertDialog.Builder(this)
-                .setTitle("Hentikan ${selected.size} aplikasi?")
-                .setMessage("Aplikasi akan dihentikan paksa.")
-                .setPositiveButton("Hentikan") { _, _ -> executeKill(selected) }
-                .setNegativeButton("Batal", null)
-                .show()
-        }
+        AlertDialog.Builder(this)
+            .setTitle("Hentikan ${selected.size} aplikasi?")
+            .setMessage("Aplikasi akan dihentikan paksa.")
+            .setPositiveButton("Hentikan") { _, _ -> executeKill(selected) }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 
     private fun executeKill(apps: List<KillerAppItem>) {
