@@ -1,6 +1,7 @@
 package com.toolsku.app.shortcut
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -17,6 +18,10 @@ import kotlinx.coroutines.launch
  */
 class QuickActionActivity : AppCompatActivity() {
 
+    companion object {
+        private const val TAG = "ToolskuQuick"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -29,13 +34,29 @@ class QuickActionActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                // Kumpulkan app untuk kill
+                // 1. Ambil app untuk KILL (user apps running)
                 val runningApps = AppRepository.getRunningApps(this@QuickActionActivity)
-                val systemApps = AppRepository.getSafeSystemApps(this@QuickActionActivity)
+                Log.i(TAG, "Running apps: ${runningApps.size}")
+
+                // 2. Ambil app untuk CLEAR CACHE (safe system apps)
+                var systemApps = AppRepository.getSafeSystemApps(this@QuickActionActivity)
+                Log.i(TAG, "Safe system apps: ${systemApps.size}")
+
+                // Fallback: kalau system apps kosong, ambil user apps untuk clear cache
+                if (systemApps.isEmpty()) {
+                    Log.w(TAG, "No safe system apps found, using user apps for cache clear")
+                    val allUserApps = AppRepository.getInstalledApps(
+                        this@QuickActionActivity,
+                        includeSystem = false
+                    )
+                    // Ambil 20 app pertama (biar tidak terlalu lama)
+                    systemApps = allUserApps.take(20)
+                    Log.i(TAG, "Fallback user apps for cache: ${systemApps.size}")
+                }
 
                 val allTasks = mutableListOf<AutomationTask>()
 
-                // Task 1: Kill user apps
+                // TASK 1: Kill user apps yang running
                 for (app in runningApps) {
                     val steps = mutableListOf<ActionStep>()
                     steps.add(ActionStep.OpenAppInfo(app.packageName))
@@ -49,7 +70,7 @@ class QuickActionActivity : AppCompatActivity() {
                     allTasks.add(AutomationTask(app.packageName, app.label, steps))
                 }
 
-                // Task 2: Clear cache system apps
+                // TASK 2: Clear cache (system apps ATAU fallback user apps)
                 for (app in systemApps) {
                     val steps = mutableListOf<ActionStep>()
                     steps.add(ActionStep.OpenAppInfo(app.packageName))
@@ -68,6 +89,8 @@ class QuickActionActivity : AppCompatActivity() {
                     allTasks.add(AutomationTask(app.packageName, app.label, steps))
                 }
 
+                Log.i(TAG, "Total tasks: ${allTasks.size} (kill=${runningApps.size}, clean=${systemApps.size})")
+
                 if (allTasks.isEmpty()) {
                     Toast.makeText(
                         this@QuickActionActivity,
@@ -78,20 +101,21 @@ class QuickActionActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                // Setup stop callback (tidak ada tombol, tapi jaga-jaga)
+                // Setup stop callback
                 AutomationAccessibilityService.onStopClick = {
                     service.cancelQueue()
                     service.hideOverlay()
                     finish()
                 }
 
-                // Show overlay
-                service.showOverlay(
-                    0,
-                    allTasks.size,
-                    "",
+                // Show overlay — pakai CLEANER mode kalau ada task clean
+                val mode = if (systemApps.isNotEmpty()) {
+                    AutomationAccessibilityService.MODE_CLEANER
+                } else {
                     AutomationAccessibilityService.MODE_KILLER
-                )
+                }
+
+                service.showOverlay(0, allTasks.size, "", mode)
 
                 // Jalankan queue
                 service.runQueue(
@@ -105,8 +129,8 @@ class QuickActionActivity : AppCompatActivity() {
                             AutomationAccessibilityService.onStopClick = null
                             Toast.makeText(
                                 this@QuickActionActivity,
-                                "Selesai: ${stats.success} sukses",
-                                Toast.LENGTH_SHORT
+                                "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
+                                Toast.LENGTH_LONG
                             ).show()
                             finish()
                         }
@@ -114,6 +138,7 @@ class QuickActionActivity : AppCompatActivity() {
                 )
 
             } catch (e: Exception) {
+                Log.e(TAG, "Error", e)
                 Toast.makeText(
                     this@QuickActionActivity,
                     "Error: ${e.message}",
