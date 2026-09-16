@@ -71,7 +71,7 @@
             android:textSize="13sp" />
     </LinearLayout>
 
-    <!-- TOP BAR (refresh + select all) -->
+    <!-- TOP BAR -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
