@@ -5,10 +5,6 @@ import com.toolsku.app.killer.action.ClickOKAction
 import com.toolsku.app.killer.action.EmptyAction
 import com.toolsku.app.killer.core.StepResult
 
-/**
- * Step: Klik tombol "OK" di dialog konfirmasi.
- * Tiru dari `q40` Baxa.
- */
 class ClickConfirmStep(
     private val openAppInfoStep: OpenAppInfoStep
 ) : BaseStep() {
@@ -25,7 +21,6 @@ class ClickConfirmStep(
 
     override fun execute(): StepResult {
         Log.d(TAG, "Waiting for confirm dialog...")
-        // Tunggu event accessibility
         return StepResult.waitEvent()
     }
 
