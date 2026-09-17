@@ -3,19 +3,21 @@ package com.toolsku.app.core
 /**
  * Kategorisasi aplikasi sistem.
  *
- * - DANGEROUS: tidak boleh di-kill sama sekali (bisa merusak sistem)
+ * - DANGEROUS: tidak boleh di-kill/clear sama sekali
  * - SAFE: boleh di-kill (galeri, kamera, browser, dll)
  */
 object SystemApps {
 
     /**
-     * System apps yang TIDAK BOLEH di-kill.
-     * Bisa menyebabkan sistem crash, tidak stabil, atau tidak bisa dipakai.
+     * System apps yang TIDAK BOLEH di-kill / clear cache.
+     * Bisa menyebabkan sistem crash.
      */
     private val DANGEROUS_PACKAGES = setOf(
         // System UI & Settings
         "com.android.systemui",
+        "com.coloros.systemui",
         "com.android.settings",
+        "com.coloros.settings",
         "com.android.shell",
         "com.android.providers.settings",
         "com.android.providers.media",
@@ -25,6 +27,8 @@ object SystemApps {
         "com.android.providers.downloads",
         "com.android.providers.userdictionary",
         "com.android.providers.blockednumber",
+        "com.android.providers.media.module",
+        "com.android.providers.contacts.module",
 
         // Telephony & Phone
         "com.android.server.telecom",
@@ -32,14 +36,21 @@ object SystemApps {
         "com.android.phone",
         "com.android.mms",
         "com.android.messaging",
+        "com.coloros.phonemanager",
+        "com.coloros.phone",
+        "com.coloros.contacts",
+        "com.android.contacts",
 
         // System Services
         "com.android.bluetooth",
         "com.android.nfc",
         "com.android.se",
         "com.android.keychain",
+        "com.android.certinstaller",
+        "com.android.packageinstaller",
+        "com.android.permissioncontroller",
 
-        // Google Services (penting)
+        // Google Services
         "com.google.android.gms",
         "com.google.android.gsf",
         "com.google.android.gsf.login",
@@ -56,18 +67,19 @@ object SystemApps {
         "com.android.launcher",
         "com.coloros.launcher",
         "com.oppo.launcher",
+        "com.realme.launcher",
         "com.android.inputmethod",
         "com.google.android.inputmethod",
         "com.baidu.input",
         "com.sohu.inputmethod",
         "com.coloros.alarmclock",
         "com.android.internal",
-        "com.android.server"
+        "com.android.server",
+        "com.android.providers"
     )
 
     /**
-     * System apps yang AMAN di-kill.
-     * Biasanya app bawaan OEM (galeri, kamera, browser, dll).
+     * System apps yang AMAN di-kill (untuk Killer).
      */
     private val SAFE_SYSTEM_PACKAGES = setOf(
         // Galeri
@@ -113,15 +125,17 @@ object SystemApps {
 
         // Email
         "com.android.email",
-        "com.coloros.email"
+        "com.coloros.email",
+
+        // Theme & Store
+        "com.heytap.themestore",
+        "com.coloros.themestore"
     )
 
-    /**
-     * Prefix package yang AMAN di-kill.
-     */
     private val SAFE_SYSTEM_PREFIXES = listOf(
         "com.coloros.gallery",
         "com.oppo.gallery",
+        "com.realme.gallery",
         "com.coloros.camera",
         "com.oppo.camera",
         "com.coloros.video",
@@ -133,7 +147,7 @@ object SystemApps {
     )
 
     /**
-     * Cek apakah package adalah system app (bawaan ROM).
+     * Cek apakah package adalah system app.
      */
     fun isSystemApp(pkg: String): Boolean {
         return pkg.startsWith("com.android.") ||
