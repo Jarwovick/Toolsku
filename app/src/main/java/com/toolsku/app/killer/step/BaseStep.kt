@@ -2,18 +2,16 @@ package com.toolsku.app.killer.step
 
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import com.toolsku.app.killer.action.BaseAction
 import com.toolsku.app.killer.core.ActionStep
 import com.toolsku.app.killer.core.StepResult
-import com.toolsku.app.killer.core.TaskStateMachine
+import com.toolsku.app.killer.engine.TaskStateMachine
 import java.util.concurrent.CopyOnWriteArrayList
 
 abstract class BaseStep : ActionStep {
 
     companion object {
-        private const val TAG = "BaseStep"
         const val TYPE_WINDOW_STATE_CHANGED = 32
         const val TYPE_WINDOW_CONTENT_CHANGED = 2048
         const val TYPE_WINDOWS_CHANGED = 4194304
@@ -138,7 +136,7 @@ abstract class BaseStep : ActionStep {
     override fun getCurrentWindowId(): Int = currentWindowId
 
     override fun onResult(result: StepResult) {
-        // Default: no-op, bisa di-override
+        // Default: no-op
     }
 
     fun getPackage(): String = currentPackage
