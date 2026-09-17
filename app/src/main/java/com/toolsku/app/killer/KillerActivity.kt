@@ -130,11 +130,8 @@ class KillerActivity : AppCompatActivity() {
 
         if (intent.getBooleanExtra("refresh_after_kill", false)) {
             Log.i(TAG, "onNewIntent: refresh after kill")
-            // Reset isProcessing karena kita baru balik dari kill
             isProcessing = false
             updateButtonCount()
-
-            // Refresh daftar
             loadApps()
             updateRamInfo()
         }
@@ -334,7 +331,6 @@ class KillerActivity : AppCompatActivity() {
             steps.add(ActionStep.Wait(200))
             steps.add(ActionStep.ClickByText(OemProfile.forceStopConfirmLabels))
             steps.add(ActionStep.Wait(200))
-            // Cukup 1x Back — sisanya di-force oleh Intent
             steps.add(ActionStep.Back)
             steps.add(ActionStep.Wait(150))
             AutomationTask(app.packageName, app.label, steps)
@@ -347,7 +343,6 @@ class KillerActivity : AppCompatActivity() {
             },
             onComplete = { stats ->
                 runOnUiThread {
-                    // 1. Sembunyikan overlay
                     service.hideOverlay()
                     AutomationAccessibilityService.onStopClick = null
                     isProcessing = false
@@ -359,13 +354,9 @@ class KillerActivity : AppCompatActivity() {
                         Toast.LENGTH_SHORT
                     ).show()
 
-                    // 2. Mark app sebagai closed di DB
                     markAsClosed(apps)
-
-                    // 3. ⭐ FORCE buka KillerActivity
                     forceBackToKiller()
 
-                    // 4. Setelah 4 detik, cek auto-restart
                     handler.postDelayed({
                         checkAutoRestart(apps)
                     }, 4000)
@@ -376,13 +367,15 @@ class KillerActivity : AppCompatActivity() {
 
     /**
      * Force kembali ke KillerActivity — hapus semua activity di atasnya.
+     *
+     * CATATAN: `or` harus di AKHIR baris untuk multi-line.
      */
     private fun forceBackToKiller() {
         try {
             val intent = Intent(this, KillerActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP 
-                        or Intent.FLAG_ACTIVITY_SINGLE_TOP 
-                        or Intent.FLAG_ACTIVITY_NEW_TASK
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_NEW_TASK
                 putExtra("refresh_after_kill", true)
             }
             startActivity(intent)
@@ -410,7 +403,6 @@ class KillerActivity : AppCompatActivity() {
 
                 Log.i(TAG, "Marked as closed successfully")
 
-                // Refresh daftar setelah 500ms
                 delay(500)
                 loadApps()
             } catch (e: Exception) {
