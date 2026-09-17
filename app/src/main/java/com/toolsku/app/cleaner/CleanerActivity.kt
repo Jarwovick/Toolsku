@@ -1,5 +1,7 @@
 package com.toolsku.app.cleaner
 
+import android.app.ActivityManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -91,9 +93,6 @@ class CleanerActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Handle Intent baru — saat forceBackToCleaner dipanggil.
-     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -282,9 +281,14 @@ class CleanerActivity : AppCompatActivity() {
 
     /**
      * Force kembali ke CleanerActivity.
+     * Hapus task Settings (App Info) supaya Back keluar dari Toolsku.
      */
     private fun forceBackToCleaner() {
         try {
+            // 1. Kill Settings task
+            killSettingsTask()
+
+            // 2. Force back ke Cleaner
             val intent = Intent(this, CleanerActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP or
@@ -296,6 +300,35 @@ class CleanerActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "forceBackToCleaner failed", e)
             finish()
+        }
+    }
+
+    /**
+     * Kill task Settings (App Info).
+     * Supaya user tekan Back keluar dari Toolsku, bukan buka App Info lagi.
+     */
+    private fun killSettingsTask() {
+        try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val tasks = am.appTasks
+            for (task in tasks) {
+                try {
+                    val taskInfo = task.taskInfo
+                    val baseIntent = taskInfo?.baseIntent
+                    val pkg = baseIntent?.component?.packageName
+
+                    if (pkg == "com.android.settings" ||
+                        pkg == "com.coloros.settings" ||
+                        pkg == "com.oppo.settings") {
+                        task.finishAndRemoveTask()
+                        Log.i(TAG, "Killed Settings task: $pkg")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to kill task", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "killSettingsTask failed", e)
         }
     }
 }
