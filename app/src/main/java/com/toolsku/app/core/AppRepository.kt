@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.util.Log
+import com.toolsku.app.core.db.DatabaseProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -12,6 +13,9 @@ object AppRepository {
 
     private const val TAG = "AppRepo"
 
+    /**
+     * Ambil daftar app terinstall (user + system).
+     */
     suspend fun getInstalledApps(context: Context, includeSystem: Boolean = false): List<AppInfo> =
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
@@ -42,6 +46,9 @@ object AppRepository {
             result
         }
 
+    /**
+     * Ambil semua app untuk Cleaner (kecuali dangerous).
+     */
     suspend fun getAllAppsForCleaner(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
@@ -70,6 +77,10 @@ object AppRepository {
             result
         }
 
+    /**
+     * Ambil safe system apps (dari PackageManager).
+     * Fallback kalau DB kosong.
+     */
     suspend fun getSafeSystemApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
@@ -97,6 +108,50 @@ object AppRepository {
             result
         }
 
+    /**
+     * ⭐ BARU: Ambil running USER apps dari DB.
+     */
+    suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
+        val pm = context.packageManager
+        val result = mutableListOf<AppInfo>()
+
+        try {
+            val dao = DatabaseProvider.runningAppDao()
+            val entities = dao.getRunningUserApps()
+
+            Log.i(TAG, "DB running user apps: ${entities.size}")
+
+            for (entity in entities) {
+                if (SystemApps.isDangerousSystemApp(entity.packageName)) continue
+                if (Prefs.isException(entity.packageName)) continue
+
+                try {
+                    val appInfo = pm.getApplicationInfo(entity.packageName, 0)
+                    result.add(
+                        AppInfo(
+                            packageName = entity.packageName,
+                            label = pm.getApplicationLabel(appInfo).toString(),
+                            icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
+                            isSystem = false,
+                            isException = false
+                        )
+                    )
+                } catch (e: Exception) {
+                    dao.delete(entity.packageName)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get running apps", e)
+        }
+
+        result.sortBy { it.label.lowercase() }
+        Log.i(TAG, "Final running user apps: ${result.size}")
+        result
+    }
+
+    /**
+     * Ambil exception apps.
+     */
     suspend fun getExceptionApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
