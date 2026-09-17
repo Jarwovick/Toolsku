@@ -6,8 +6,8 @@ import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
-import androidx.annotation.RequiresApi
 import com.toolsku.app.R
 
 /**
@@ -15,11 +15,11 @@ import com.toolsku.app.R
  */
 object ShortcutHelper {
 
+    private const val TAG = "ShortcutHelper"
     private const val SHORTCUT_ID = "toolsku_quick"
 
     /**
      * Minta Android untuk pin shortcut ke home screen.
-     * User akan lihat dialog konfirmasi dari Android.
      */
     fun requestPinShortcut(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
@@ -33,6 +33,11 @@ object ShortcutHelper {
 
         try {
             val shortcutManager = context.getSystemService(ShortcutManager::class.java)
+
+            if (shortcutManager == null) {
+                Toast.makeText(context, "ShortcutManager tidak tersedia", Toast.LENGTH_LONG).show()
+                return
+            }
 
             if (!shortcutManager.isRequestPinShortcutSupported) {
                 Toast.makeText(
@@ -57,12 +62,48 @@ object ShortcutHelper {
 
             shortcutManager.requestPinShortcut(shortcutInfo, null)
 
+            Toast.makeText(
+                context,
+                "Konfirmasi dialog untuk tambah shortcut",
+                Toast.LENGTH_SHORT
+            ).show()
+
         } catch (e: Exception) {
+            Log.e(TAG, "Failed to pin shortcut", e)
             Toast.makeText(
                 context,
                 "Gagal buat shortcut: ${e.message}",
                 Toast.LENGTH_LONG
             ).show()
+        }
+    }
+
+    /**
+     * Cek apakah shortcut sudah dipasang.
+     */
+    fun isShortcutPinned(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+
+        return try {
+            val shortcutManager = context.getSystemService(ShortcutManager::class.java)
+            val pinnedShortcuts = shortcutManager?.pinnedShortcuts ?: return false
+            pinnedShortcuts.any { it.id == SHORTCUT_ID }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Hapus shortcut (kalau ada).
+     */
+    fun removeShortcut(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+
+        try {
+            val shortcutManager = context.getSystemService(ShortcutManager::class.java)
+            shortcutManager?.removeDynamicShortcuts(listOf(SHORTCUT_ID))
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to remove shortcut", e)
         }
     }
 }
