@@ -121,9 +121,6 @@ class KillerActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Handle Intent baru — saat forceBackToKiller dipanggil.
-     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -366,9 +363,8 @@ class KillerActivity : AppCompatActivity() {
     }
 
     /**
-     * Force kembali ke KillerActivity — hapus semua activity di atasnya.
-     *
-     * CATATAN: `or` harus di AKHIR baris untuk multi-line.
+     * Force kembali ke KillerActivity.
+     * `or` di AKHIR baris untuk multi-line.
      */
     private fun forceBackToKiller() {
         try {
@@ -388,6 +384,7 @@ class KillerActivity : AppCompatActivity() {
 
     /**
      * Mark app yang di-kill sebagai "closed" di database.
+     * Semua app (user + system) di-mark di DB.
      */
     private fun markAsClosed(apps: List<KillerAppItem>) {
         lifecycleScope.launch {
