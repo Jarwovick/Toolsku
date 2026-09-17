@@ -7,10 +7,6 @@ import android.util.Log
 import com.toolsku.app.killer.action.EmptyAction
 import com.toolsku.app.killer.core.StepResult
 
-/**
- * Step: Fallback — buka Settings.
- * Tiru dari `yy1` Baxa.
- */
 class FallbackStep(
     private val context: Context,
     private val packageName: String
