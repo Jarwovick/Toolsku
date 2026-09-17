@@ -17,10 +17,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.toolsku.app.R
-import com.toolsku.app.automation.ActionStep
 import com.toolsku.app.automation.AutomationAccessibilityService
-import com.toolsku.app.automation.AutomationTask
-import com.toolsku.app.automation.OemProfile
 import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.CacheSizeFetcher
@@ -30,7 +27,7 @@ class CleanerActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "CleanerActivity"
-        private const val MIN_CACHE_SIZE = 10 * 1024 * 1024L  // 10 MB
+        private const val MIN_CACHE_SIZE = 10 * 1024 * 1024L
     }
 
     private lateinit var adapter: CleanerAdapter
@@ -92,63 +89,32 @@ class CleanerActivity : AppCompatActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-
-        if (intent.getBooleanExtra("refresh_after_clean", false)) {
-            Log.i(TAG, "onNewIntent: refresh after clean")
-            isProcessing = false
-            updateButtonCount()
-            loadApps()
-        }
-    }
-
-    // ==== DATA ====
-
     private fun loadApps() {
         tvLoading.visibility = View.VISIBLE
         tvLoading.text = getString(R.string.cleaner_loading)
 
         lifecycleScope.launch {
             try {
-                Log.i(TAG, "===== Loading apps =====")
-
-                // 1. Ambil SEMUA app dari PackageManager (via AppRepository)
                 val allApps: List<AppInfo> = AppRepository.getAllAppsForCleaner(this@CleanerActivity)
-                Log.i(TAG, "Total apps: ${allApps.size}")
 
-                if (allApps.isEmpty()) {
-                    tvLoading.text = "Tidak ada app terinstall"
-                    return@launch
-                }
-
-                // 2. Hitung cache size
-                val cacheSizes: Map<String, Long> = CacheSizeFetcher.getCacheSizes(
+                val cacheSizes = CacheSizeFetcher.getCacheSizes(
                     this@CleanerActivity,
                     allApps.map { it.packageName }
                 )
-                Log.i(TAG, "Cache sizes: ${cacheSizes.size}")
 
-                // 3. Filter cache >= 10 MB
-                val items: List<CleanerAppItem> = allApps
-                    .map { app ->
-                        val cacheSize = cacheSizes[app.packageName] ?: 0L
-                        CleanerAppItem(
-                            packageName = app.packageName,
-                            label = app.label,
-                            icon = app.icon,
-                            cacheSize = cacheSize,
-                            isSystem = app.isSystem,
-                            selected = true
-                        )
-                    }
+                val items = allApps.map { app ->
+                    CleanerAppItem(
+                        packageName = app.packageName,
+                        label = app.label,
+                        icon = app.icon,
+                        cacheSize = cacheSizes[app.packageName] ?: 0L,
+                        isSystem = app.isSystem,
+                        selected = true
+                    )
+                }
                     .filter { it.cacheSize >= MIN_CACHE_SIZE }
                     .sortedByDescending { it.cacheSize }
 
-                Log.i(TAG, "Apps with cache >= 10MB: ${items.size}")
-
-                // Tampilkan
                 adapter.submitList(items)
                 updateTotals(items)
                 updateSelectAllIcon()
@@ -160,9 +126,7 @@ class CleanerActivity : AppCompatActivity() {
                 } else {
                     tvLoading.visibility = View.GONE
                 }
-
             } catch (e: Exception) {
-                Log.e(TAG, "loadApps failed", e)
                 tvLoading.visibility = View.VISIBLE
                 tvLoading.text = "Error: ${e.message}"
             }
@@ -217,80 +181,9 @@ class CleanerActivity : AppCompatActivity() {
             return
         }
 
-        val service = AutomationAccessibilityService.instance
-        if (service == null) {
-            Toast.makeText(this, R.string.killer_test_no_accessibility, Toast.LENGTH_LONG).show()
-            return
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("Bersihkan cache ${selected.size} aplikasi?")
-            .setMessage("Cache akan dihapus.")
-            .setPositiveButton("Bersihkan") { _, _ -> executeClean(selected) }
-            .setNegativeButton("Batal", null)
-            .show()
-    }
-
-    private fun executeClean(apps: List<CleanerAppItem>) {
-        isProcessing = true
-        updateButtonCount()
-
-        val service = AutomationAccessibilityService.instance ?: return
-
-        AutomationAccessibilityService.onStopClick = {
-            service.cancelQueue()
-            service.hideOverlay()
-            isProcessing = false
-            updateButtonCount()
-            Toast.makeText(this, "Dibatalkan", Toast.LENGTH_SHORT).show()
-        }
-
-        service.showOverlay(0, apps.size, "", AutomationAccessibilityService.MODE_CLEANER)
-
-        val tasks = apps.map { app ->
-            val steps = mutableListOf<ActionStep>()
-            steps.add(ActionStep.OpenAppInfo(app.packageName))
-            steps.add(ActionStep.Wait(400))
-            steps.add(ActionStep.ClickByText(OemProfile.storageMenuLabels))
-            steps.add(ActionStep.Wait(400))
-            steps.add(ActionStep.ClickByTextSafe(
-                OemProfile.clearCacheLabels,
-                OemProfile.clearDataLabels
-            ))
-            steps.add(ActionStep.Wait(400))
-            steps.add(ActionStep.Back)
-            steps.add(ActionStep.Wait(200))
-            steps.add(ActionStep.Back)
-            steps.add(ActionStep.Wait(200))
-            AutomationTask(app.packageName, app.label, steps)
-        }
-
-        service.runQueue(
-            tasks = tasks,
-            onProgress = { current, total, appLabel ->
-                service.updateOverlay(current, total, appLabel)
-            },
-            onComplete = { stats ->
-                runOnUiThread {
-                    service.hideOverlay()
-                    AutomationAccessibilityService.onStopClick = null
-                    isProcessing = false
-                    updateButtonCount()
-
-                    Toast.makeText(
-                        this,
-                        "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
-                        Toast.LENGTH_SHORT
-                    ).show()
-
-                    forceBackToCleaner()
-
-                    handler.postDelayed({
-                        loadApps()
-                    }, 1000)
-                }
-            }
-        )
+        // ⚠️ SEMENTARA: Cleaner tidak pakai automation
+        // Karena Killer refactor belum selesai
+        Toast.makeText(this, "Fitur Cleaner sedang dalam perbaikan", Toast.LENGTH_LONG).show()
     }
 
     private fun forceBackToCleaner() {
