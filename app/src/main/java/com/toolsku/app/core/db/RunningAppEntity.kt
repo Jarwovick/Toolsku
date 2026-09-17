@@ -14,6 +14,9 @@ data class RunningAppEntity(
     /** Timestamp terakhir app ini dibuka */
     val lastUsed: Long = System.currentTimeMillis(),
 
+    /** App sistem atau bukan */
+    val isSystem: Boolean = false,
+
     /** App yang auto-restart setelah di-kill */
     val isAutoRestarted: Boolean = false,
 
