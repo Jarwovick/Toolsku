@@ -1,6 +1,7 @@
 package com.toolsku.app.automation
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.util.Log
 import com.toolsku.app.core.Prefs
@@ -14,7 +15,6 @@ import kotlinx.coroutines.launch
 
 /**
  * Tracker untuk app yang dibuka/ditutup.
- * Basis data: Room database.
  */
 object AppTracker {
 
@@ -22,8 +22,7 @@ object AppTracker {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
-     * Track app yang baru dibuka.
-     * Dipanggil dari Accessibility Service.
+     * Track app yang baru dibuka (user + system).
      */
     fun trackAppOpened(context: Context, packageName: String) {
         if (shouldSkip(context, packageName)) return
@@ -31,20 +30,23 @@ object AppTracker {
         scope.launch {
             try {
                 val dao = DatabaseProvider.runningAppDao()
+                val isSystem = isSystemApp(context, packageName)
+
                 val existing = dao.getApp(packageName)
 
                 if (existing == null) {
-                    // App baru — insert
+                    // App baru
                     dao.upsert(
                         RunningAppEntity(
                             packageName = packageName,
                             lastUsed = System.currentTimeMillis(),
+                            isSystem = isSystem,
                             isClosed = false
                         )
                     )
-                    Log.d(TAG, "New app: $packageName")
+                    Log.d(TAG, "New ${if (isSystem) "system" else "user"} app: $packageName")
                 } else {
-                    // App sudah ada — update timestamp + reset isClosed
+                    // Update
                     dao.upsert(
                         existing.copy(
                             lastUsed = System.currentTimeMillis(),
@@ -59,73 +61,67 @@ object AppTracker {
         }
     }
 
-    /**
-     * Track app yang ditutup (user kembali ke launcher).
-     */
     fun trackAppClosed(packageName: String) {
         scope.launch {
             try {
                 DatabaseProvider.runningAppDao().markClosed(packageName)
-                Log.d(TAG, "Closed app: $packageName")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to mark closed: $packageName", e)
             }
         }
     }
 
-    /**
-     * Track app yang auto-restart setelah di-kill.
-     */
     fun trackAutoRestart(packageName: String) {
         scope.launch {
             try {
                 DatabaseProvider.runningAppDao().markAutoRestarted(packageName)
-                Log.d(TAG, "Auto-restarted app: $packageName")
+                Log.d(TAG, "Auto-restarted: $packageName")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to mark auto-restart: $packageName", e)
             }
         }
     }
 
-    /**
-     * Track app yang tidak bisa di-kill.
-     */
     fun trackUnclosable(packageName: String) {
         scope.launch {
             try {
                 DatabaseProvider.runningAppDao().markUnclosable(packageName)
-                Log.d(TAG, "Unclosable app: $packageName")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to mark unclosable: $packageName", e)
             }
         }
     }
 
-    /**
-     * Reset flag setelah kill — biar app muncul lagi kalau dibuka kembali.
-     */
     fun resetAfterKill(packages: List<String>) {
         scope.launch {
             try {
                 DatabaseProvider.runningAppDao().resetFlags(packages)
-                Log.d(TAG, "Reset flags for ${packages.size} apps")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to reset flags", e)
             }
         }
     }
 
-    /**
-     * Cleanup — hapus app yang lama tidak dipakai.
-     */
     fun cleanup() {
         scope.launch {
             try {
-                val cutoff = System.currentTimeMillis() - (24 * 60 * 60 * 1000L)  // 24 jam
+                val cutoff = System.currentTimeMillis() - (24 * 60 * 60 * 1000L)
                 DatabaseProvider.runningAppDao().deleteOlderThan(cutoff)
             } catch (e: Exception) {
                 Log.e(TAG, "Cleanup failed", e)
             }
+        }
+    }
+
+    /**
+     * Cek apakah package adalah system app.
+     */
+    private fun isSystemApp(context: Context, packageName: String): Boolean {
+        return try {
+            val appInfo = context.packageManager.getApplicationInfo(packageName, 0)
+            (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+        } catch (e: Exception) {
+            false
         }
     }
 
@@ -136,24 +132,27 @@ object AppTracker {
         // Skip app sendiri
         if (packageName == context.packageName) return true
 
-        // Skip system UI, launcher, keyboard
+        // Skip system UI, launcher, dll
         if (packageName in SKIP_PACKAGES) return true
 
         // Skip launcher
         if (packageName.contains("launcher")) return true
 
+        // Skip keyboard
+        if (packageName.contains("inputmethod")) return true
+
         // Skip app yang di-exception
         if (Prefs.isException(packageName)) return true
 
-        // Skip app system yang dangerous
+        // ⭐ Skip HANYA yang dangerous — safe system apps BOLEH di-track
         if (SystemApps.isDangerousSystemApp(packageName)) return true
 
-        // Cek apakah app punya launch intent (bukan service)
+        // Cek apakah app punya launch intent
         return try {
             val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
-            launchIntent == null  // skip kalau tidak punya launch intent
+            launchIntent == null
         } catch (e: PackageManager.NameNotFoundException) {
-            true  // skip kalau tidak terinstall
+            true
         }
     }
 
@@ -161,6 +160,8 @@ object AppTracker {
         "com.android.systemui",
         "com.android.settings",
         "com.android.providers.settings",
-        "com.android.shell"
+        "com.android.shell",
+        "com.android.providers.media",
+        "com.android.providers.contacts"
     )
 }
