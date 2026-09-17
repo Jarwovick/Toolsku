@@ -9,10 +9,6 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * Helper untuk mendapat ukuran cache per app.
- * Hitung TOTAL cache (internal + external).
- */
 object CacheSizeFetcher {
 
     private const val TAG = "CacheSizeFetcher"
@@ -20,8 +16,6 @@ object CacheSizeFetcher {
     /**
      * Ambil ukuran cache per package.
      * Return Map<packageName, cacheSizeInBytes>
-     *
-     * Cache size = internal cache + external cache (jika ada).
      */
     suspend fun getCacheSizes(
         context: Context,
@@ -44,10 +38,7 @@ object CacheSizeFetcher {
                 val uuid = storageManager.getUuidForPath(Environment.getDataDirectory())
                 val stats = storageStatsManager.queryStatsForUid(uuid, appInfo.uid)
 
-                // Hitung cache internal
                 val internalCache = stats.cacheBytes
-
-                // Hitung cache external (API 29+)
                 val externalCache = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     try {
                         stats.externalCacheBytes
@@ -58,12 +49,10 @@ object CacheSizeFetcher {
                     0L
                 }
 
-                val totalCache = internalCache + externalCache
-                result[pkg] = totalCache
-
-                Log.d(TAG, "$pkg: internal=$internalCache, external=$externalCache, total=$totalCache")
+                result[pkg] = internalCache + externalCache
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to get cache size for $pkg", e)
+                // ⭐ Skip error — jangan crash
+                Log.w(TAG, "Skip $pkg: ${e.message}")
                 result[pkg] = 0L
             }
         }
@@ -71,9 +60,6 @@ object CacheSizeFetcher {
         result
     }
 
-    /**
-     * Ambil ukuran cache satu app.
-     */
     suspend fun getCacheSize(context: Context, packageName: String): Long =
         withContext(Dispatchers.IO) {
             try {
