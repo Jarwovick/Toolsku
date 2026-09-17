@@ -2,28 +2,24 @@ package com.toolsku.app.killer.step
 
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import com.toolsku.app.killer.action.BaseAction
 import com.toolsku.app.killer.core.ActionStep
 import com.toolsku.app.killer.core.StepResult
+import com.toolsku.app.killer.core.TaskStateMachine
 import java.util.concurrent.CopyOnWriteArrayList
 
-/**
- * Base class untuk step.
- * Tiru dari `ip2` Baxa.
- */
 abstract class BaseStep : ActionStep {
 
-    /**
-     * Daftar action dalam step ini.
-     */
-    protected val actions: MutableList<BaseAction> = CopyOnWriteArrayList()
+    companion object {
+        private const val TAG = "BaseStep"
+        const val TYPE_WINDOW_STATE_CHANGED = 32
+        const val TYPE_WINDOW_CONTENT_CHANGED = 2048
+        const val TYPE_WINDOWS_CHANGED = 4194304
+    }
 
-    /**
-     * Event types yang di-handle.
-     * ⚠️ Rename dari `supportedEvents` ke `eventTypes` untuk hindari
-     * konflik dengan `ActionStep.getSupportedEvents()`.
-     */
+    protected val actions: MutableList<BaseAction> = CopyOnWriteArrayList()
     protected val eventTypes: MutableList<Int> = CopyOnWriteArrayList()
 
     @Volatile
@@ -35,18 +31,13 @@ abstract class BaseStep : ActionStep {
     protected val handler: Handler = Handler(Looper.getMainLooper())
 
     protected var currentWindowId: Int = -1
-
     protected var currentPackage: String = ""
+
+    protected var parentTask: TaskStateMachine? = null
 
     init {
         eventTypes.add(TYPE_WINDOW_STATE_CHANGED)
         eventTypes.add(TYPE_WINDOW_CONTENT_CHANGED)
-    }
-
-    companion object {
-        const val TYPE_WINDOW_STATE_CHANGED = 32
-        const val TYPE_WINDOW_CONTENT_CHANGED = 2048
-        const val TYPE_WINDOWS_CHANGED = 4194304
     }
 
     override fun start(): StepResult {
@@ -60,9 +51,6 @@ abstract class BaseStep : ActionStep {
         }
     }
 
-    /**
-     * Eksekusi step — override di subclass.
-     */
     protected abstract fun execute(): StepResult
 
     override fun handleEvent(
@@ -73,12 +61,10 @@ abstract class BaseStep : ActionStep {
     ): StepResult {
         if (!running) return StepResult.keepStage()
 
-        // Cek event type didukung
         if (!eventTypes.contains(eventType)) {
             return StepResult.keepStage()
         }
 
-        // Cek window ID (skip event dari window lain)
         if (node != null) {
             try {
                 val windowId = node.windowId
@@ -90,13 +76,9 @@ abstract class BaseStep : ActionStep {
             }
         }
 
-        // Process actions
         return processActions(eventType, node)
     }
 
-    /**
-     * Process actions dengan node.
-     */
     private fun processActions(
         eventType: Int,
         node: AccessibilityNodeInfo?
@@ -139,16 +121,25 @@ abstract class BaseStep : ActionStep {
 
     override fun isRunning(): Boolean = running
 
-    /**
-     * Return event types — dipanggil oleh ActionStep interface.
-     */
     override fun getSupportedEvents(): List<Int> = eventTypes
 
     override fun pause() {
         paused = true
     }
 
-    open fun canSkip(): Boolean = false
+    override fun setParentTask(task: TaskStateMachine) {
+        this.parentTask = task
+    }
+
+    override fun setCurrentWindowId(windowId: Int) {
+        this.currentWindowId = windowId
+    }
+
+    override fun getCurrentWindowId(): Int = currentWindowId
+
+    override fun onResult(result: StepResult) {
+        // Default: no-op, bisa di-override
+    }
 
     fun getPackage(): String = currentPackage
 }
