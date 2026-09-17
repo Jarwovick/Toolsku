@@ -2,6 +2,9 @@ package com.toolsku.app.killer.core
 
 /**
  * State untuk UI — tiru dari `v1` Baxa.
+ *
+ * ⚠️ CATATAN: CancelReason TIDAK dideklarasikan di sini.
+ * Ada di file terpisah: `CancelReason.kt`.
  */
 data class TaskState(
     val isRunning: Boolean = false,
@@ -14,16 +17,15 @@ data class TaskState(
 ) {
     companion object {
         fun idle(): TaskState = TaskState()
-        fun running(total: Int, current: String): TaskState =
-            TaskState(isRunning = true, totalApps = total, currentAppName = current)
-        fun completed(): TaskState = TaskState(isComplete = true)
-    }
-}
 
-enum class CancelReason {
-    NONE,
-    USER_CANCELLED,
-    HOME_BUTTON,
-    SCREEN_OFF,
-    ACCESSIBILITY_ERROR
+        fun running(total: Int, current: String): TaskState =
+            TaskState(
+                isRunning = true,
+                totalApps = total,
+                currentAppName = current
+            )
+
+        fun completed(): TaskState =
+            TaskState(isComplete = true)
+    }
 }
