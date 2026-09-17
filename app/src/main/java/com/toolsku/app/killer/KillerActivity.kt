@@ -23,16 +23,12 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.toolsku.app.R
-import com.toolsku.app.automation.ActionStep
-import com.toolsku.app.automation.AppTracker
 import com.toolsku.app.automation.AutomationAccessibilityService
-import com.toolsku.app.automation.AutomationTask
-import com.toolsku.app.automation.OemProfile
-import com.toolsku.app.automation.QueueStats
 import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.Prefs
 import com.toolsku.app.core.db.DatabaseProvider
+import com.toolsku.app.killer.engine.QueueManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -86,14 +82,11 @@ class KillerActivity : AppCompatActivity() {
             adapter = this@KillerActivity.adapter
         }
 
-        btnRefresh.setOnClickListener {
-            loadApps()
-        }
+        btnRefresh.setOnClickListener { loadApps() }
 
         btnSelectAll.setOnClickListener {
             val allCurrentlySelected = adapter.getAppItems().all { it.selected }
-            val newState = !allCurrentlySelected
-            adapter.selectAll(newState)
+            adapter.selectAll(!allCurrentlySelected)
             updateSelectAllState()
             updateButtonCount()
         }
@@ -311,113 +304,52 @@ class KillerActivity : AppCompatActivity() {
 
         val service = AutomationAccessibilityService.instance ?: return
 
-        AutomationAccessibilityService.onStopClick = {
-            service.cancelQueue()
-            service.hideOverlay()
-            isProcessing = false
-            updateButtonCount()
-            Toast.makeText(this, "Dibatalkan", Toast.LENGTH_SHORT).show()
+        // Convert ke AppToKill
+        val appToKills = apps.map {
+            QueueManager.AppToKill(
+                packageName = it.packageName,
+                appLabel = it.label
+            )
         }
 
-        service.showOverlay(0, apps.size, "", AutomationAccessibilityService.MODE_KILLER)
-
-        val tasks = apps.map { app ->
-            val steps = mutableListOf<ActionStep>()
-            steps.add(ActionStep.OpenAppInfo(app.packageName))
-            steps.add(ActionStep.Wait(300))
-            steps.add(ActionStep.ClickByText(OemProfile.forceStopButtonLabels))
-            steps.add(ActionStep.Wait(200))
-            steps.add(ActionStep.ClickByText(OemProfile.forceStopConfirmLabels))
-            steps.add(ActionStep.Wait(200))
-            steps.add(ActionStep.Back)
-            steps.add(ActionStep.Wait(150))
-            AutomationTask(app.packageName, app.label, steps)
-        }
-
-        service.runQueue(
-            tasks = tasks,
+        // Start queue via service
+        val started = service.startKillQueue(
+            apps = appToKills,
             onProgress = { current, total, appLabel ->
-                service.updateOverlay(current, total, appLabel)
+                Log.d(TAG, "Progress: $current/$total — $appLabel")
             },
-            onComplete = { stats ->
+            onComplete = { result ->
                 runOnUiThread {
-                    service.hideOverlay()
-                    AutomationAccessibilityService.onStopClick = null
                     isProcessing = false
                     updateButtonCount()
 
                     Toast.makeText(
                         this,
-                        "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
-                        Toast.LENGTH_SHORT
+                        "Selesai: ${result.success} sukses, ${result.skipped} skip, ${result.failed} gagal",
+                        Toast.LENGTH_LONG
                     ).show()
 
+                    // Mark apps closed
                     markAsClosed(apps)
-                    forceBackToKiller()
 
+                    // Refresh daftar
                     handler.postDelayed({
-                        checkAutoRestart(apps)
-                    }, 4000)
+                        loadApps()
+                        updateRamInfo()
+                    }, 500)
                 }
             }
         )
-    }
 
-    /**
-     * Force kembali ke KillerActivity.
-     * Hapus task Settings (App Info) supaya Back keluar dari Toolsku.
-     */
-    private fun forceBackToKiller() {
-        try {
-            // 1. Kill Settings task
-            killSettingsTask()
-
-            // 2. Force back ke Killer
-            val intent = Intent(this, KillerActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_NEW_TASK
-                putExtra("refresh_after_kill", true)
-            }
-            startActivity(intent)
-            Log.i(TAG, "Force back to Killer via Intent")
-        } catch (e: Exception) {
-            Log.e(TAG, "forceBackToKiller failed", e)
-            finish()
+        if (!started) {
+            isProcessing = false
+            updateButtonCount()
+            Toast.makeText(this, "Gagal memulai queue", Toast.LENGTH_SHORT).show()
         }
     }
 
     /**
-     * Kill task Settings (App Info).
-     * Supaya user tekan Back keluar dari Toolsku, bukan buka App Info lagi.
-     */
-    private fun killSettingsTask() {
-        try {
-            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val tasks = am.appTasks
-            for (task in tasks) {
-                try {
-                    val taskInfo = task.taskInfo
-                    val baseIntent = taskInfo?.baseIntent
-                    val pkg = baseIntent?.component?.packageName
-
-                    if (pkg == "com.android.settings" ||
-                        pkg == "com.coloros.settings" ||
-                        pkg == "com.oppo.settings") {
-                        task.finishAndRemoveTask()
-                        Log.i(TAG, "Killed Settings task: $pkg")
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to kill task", e)
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "killSettingsTask failed", e)
-        }
-    }
-
-    /**
-     * Mark app yang di-kill sebagai "closed" di database.
+     * Mark apps as closed di database.
      */
     private fun markAsClosed(apps: List<KillerAppItem>) {
         lifecycleScope.launch {
@@ -432,46 +364,8 @@ class KillerActivity : AppCompatActivity() {
                 }
 
                 Log.i(TAG, "Marked as closed successfully")
-
-                delay(500)
-                loadApps()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to mark as closed", e)
-            }
-        }
-    }
-
-    /**
-     * Cek app yang auto-restart setelah kill.
-     */
-    private fun checkAutoRestart(killedApps: List<KillerAppItem>) {
-        lifecycleScope.launch {
-            try {
-                delay(3000)
-
-                val dao = DatabaseProvider.runningAppDao()
-                var autoRestartCount = 0
-
-                killedApps.forEach { app ->
-                    val entity = dao.getApp(app.packageName)
-                    if (entity != null && !entity.isClosed) {
-                        dao.markAutoRestarted(app.packageName)
-                        autoRestartCount++
-                        Log.i(TAG, "Auto-restart: ${app.packageName}")
-                    }
-                }
-
-                if (autoRestartCount > 0) {
-                    Toast.makeText(
-                        this@KillerActivity,
-                        "$autoRestartCount app restart otomatis",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-
-                loadApps()
-            } catch (e: Exception) {
-                Log.e(TAG, "checkAutoRestart failed", e)
             }
         }
     }
