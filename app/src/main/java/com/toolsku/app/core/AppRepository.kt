@@ -1,7 +1,6 @@
 package com.toolsku.app.core
 
 import android.app.ActivityManager
-import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -120,8 +119,9 @@ object AppRepository {
         }
 
     /**
-     * Ambil safe system apps yang RUNNING (dari DB).
-     * Fallback ke live query kalau DB kosong.
+     * Ambil system apps yang RUNNING dari DB.
+     * Logic SAMA dengan getRunningApps (user apps).
+     * TIDAK ada fallback.
      */
     suspend fun getSafeSystemApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -134,60 +134,36 @@ object AppRepository {
 
                 Log.i(TAG, "DB system apps: ${entities.size}")
 
-                if (entities.isNotEmpty()) {
-                    for (entity in entities) {
-                        if (Prefs.isException(entity.packageName)) continue
+                for (entity in entities) {
+                    if (Prefs.isException(entity.packageName)) continue
 
-                        try {
-                            val appInfo = pm.getApplicationInfo(entity.packageName, 0)
-                            result.add(
-                                AppInfo(
-                                    packageName = entity.packageName,
-                                    label = pm.getApplicationLabel(appInfo).toString(),
-                                    icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
-                                    isSystem = true,
-                                    isException = false
-                                )
+                    try {
+                        val appInfo = pm.getApplicationInfo(entity.packageName, 0)
+                        result.add(
+                            AppInfo(
+                                packageName = entity.packageName,
+                                label = pm.getApplicationLabel(appInfo).toString(),
+                                icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
+                                isSystem = true,
+                                isException = false
                             )
-                        } catch (e: Exception) {
-                            dao.delete(entity.packageName)
-                        }
-                    }
-                    result.sortBy { it.label.lowercase() }
-                    return@withContext result
-                }
-
-                // Fallback: live query safe system apps
-                Log.i(TAG, "DB empty — using fallback for system apps")
-                val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                val ourPackage = context.packageName
-
-                for (app in packages) {
-                    if (app.packageName == ourPackage) continue
-                    if (!SystemApps.isSafeSystemApp(app.packageName)) continue
-                    if (Prefs.isException(app.packageName)) continue
-
-                    result.add(
-                        AppInfo(
-                            packageName = app.packageName,
-                            label = pm.getApplicationLabel(app).toString(),
-                            icon = try { pm.getApplicationIcon(app) } catch (e: Exception) { null },
-                            isSystem = true,
-                            isException = false
                         )
-                    )
+                    } catch (e: Exception) {
+                        // App sudah uninstall — hapus dari DB
+                        dao.delete(entity.packageName)
+                    }
                 }
-
-                result.sortBy { it.label.lowercase() }
-                result
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get system apps", e)
-                emptyList()
             }
+
+            result.sortBy { it.label.lowercase() }
+            Log.i(TAG, "Final system apps: ${result.size}")
+            result
         }
 
     /**
-     * Ambil daftar app USER yang RUNNING (dari DB).
+     * Ambil USER apps yang RUNNING dari DB.
      */
     suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
@@ -215,6 +191,7 @@ object AppRepository {
                         )
                     )
                 } catch (e: Exception) {
+                    // App sudah uninstall — hapus dari DB
                     dao.delete(entity.packageName)
                 }
             }
