@@ -6,17 +6,12 @@ import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import com.toolsku.app.killer.core.ActionStep
+import com.toolsku.app.killer.core.AutoRestartTracker
 import com.toolsku.app.killer.core.StepResult
 
 /**
  * State machine untuk 1 task (1 app).
  * Tiru dari `tq0` Baxa.
- *
- * Bertanggung jawab:
- * - Kelola daftar step
- * - Pindah antar step
- * - Handle event
- * - Timeout per step
  */
 class TaskStateMachine(
     private val context: Context,
@@ -36,9 +31,6 @@ class TaskStateMachine(
     private var timeoutRunnable: Runnable? = null
     private var windowId = -1
 
-    /**
-     * Mulai task.
-     */
     fun start() {
         if (isRunning) {
             Log.w(TAG, "Task already running: $packageName")
@@ -52,9 +44,6 @@ class TaskStateMachine(
         executeCurrentStep()
     }
 
-    /**
-     * Stop task.
-     */
     fun stop() {
         isRunning = false
         timeoutRunnable?.let { handler.removeCallbacks(it) }
@@ -62,9 +51,6 @@ class TaskStateMachine(
         Log.i(TAG, "Task stopped: $packageName")
     }
 
-    /**
-     * Handle accessibility event.
-     */
     fun handleEvent(
         pkg: String,
         className: String,
@@ -74,7 +60,6 @@ class TaskStateMachine(
         if (!isRunning) return
         if (currentStepIndex >= steps.size) return
 
-        // Update window id kalau ada
         if (node != null) {
             try {
                 val id = node.windowId
@@ -87,17 +72,11 @@ class TaskStateMachine(
             }
         }
 
-        // Forward ke step saat ini
         val step = steps[currentStepIndex]
         val result = step.handleEvent(pkg, className, eventType, node)
-        
-        // Handle result
         handleStepResult(result)
     }
 
-    /**
-     * Eksekusi step saat ini.
-     */
     private fun executeCurrentStep() {
         if (!isRunning) return
         if (currentStepIndex >= steps.size) {
@@ -109,39 +88,29 @@ class TaskStateMachine(
         step.setParentTask(this)
         Log.d(TAG, "Executing step ${currentStepIndex + 1}/${steps.size}: ${step.getName()}")
 
-        // Set timeout
         setupTimeout(step)
 
-        // Jalankan step
         try {
             val result = step.start()
             handleStepResult(result)
         } catch (e: Exception) {
             Log.e(TAG, "Step execution failed: ${step.getName()}", e)
-            handler.removeCallbacks(timeoutRunnable!!)
+            timeoutRunnable?.let { handler.removeCallbacks(it) }
             moveToNextStep()
         }
     }
 
-    /**
-     * Set timeout untuk step.
-     */
     private fun setupTimeout(step: ActionStep) {
         timeoutRunnable?.let { handler.removeCallbacks(it) }
         
         timeoutRunnable = Runnable {
             Log.w(TAG, "Step timeout: ${step.getName()}")
-            // Timeout → anggap selesai step ini, lanjut
             moveToNextStep()
         }
         handler.postDelayed(timeoutRunnable!!, STEP_TIMEOUT_MS)
     }
 
-    /**
-     * Handle result dari step.
-     */
     private fun handleStepResult(result: StepResult) {
-        // Cancel timeout
         timeoutRunnable?.let { handler.removeCallbacks(it) }
 
         Log.d(TAG, "Step result: $result")
@@ -157,32 +126,24 @@ class TaskStateMachine(
                 executeCurrentStep()
             }
             result.isRepeatStage() -> {
-                // Ulangi step ini
                 executeCurrentStep()
             }
             result.isComplete && result.isSuccess -> {
-                // Step selesai, lanjut
                 moveToNextStep()
             }
             result.isComplete && result.isError -> {
-                // Error — lanjut step berikut atau fail
                 Log.w(TAG, "Step error: ${steps[currentStepIndex].getName()}")
                 moveToNextStep()
             }
             result.isKeepStage() -> {
-                // Tunggu event berikutnya — set timeout lagi
                 setupTimeout(steps[currentStepIndex])
             }
             else -> {
-                // Wait event
                 setupTimeout(steps[currentStepIndex])
             }
         }
     }
 
-    /**
-     * Pindah ke step berikutnya.
-     */
     private fun moveToNextStep() {
         currentStepIndex++
         if (currentStepIndex >= steps.size) {
@@ -194,21 +155,30 @@ class TaskStateMachine(
 
     /**
      * Task selesai sukses.
+     * ⭐ Mark ke AutoRestartTracker.
      */
     private fun finishSuccess() {
         isRunning = false
         timeoutRunnable?.let { handler.removeCallbacks(it) }
         Log.i(TAG, "Task success: $packageName")
+        
+        // Mark untuk auto-restart tracking
+        AutoRestartTracker.markKilled(packageName)
+        
         onTaskComplete(TaskResult.Success(packageName, appLabel))
     }
 
     /**
      * Task di-skip.
+     * ⭐ Mark juga ke AutoRestartTracker.
      */
     private fun finishSkipped() {
         isRunning = false
         timeoutRunnable?.let { handler.removeCallbacks(it) }
         Log.i(TAG, "Task skipped: $packageName")
+        
+        AutoRestartTracker.markKilled(packageName)
+        
         onTaskComplete(TaskResult.Skipped(packageName, appLabel))
     }
 
@@ -222,15 +192,9 @@ class TaskStateMachine(
         onTaskComplete(TaskResult.Failure(packageName, appLabel, reason))
     }
 
-    /**
-     * Cek apakah task masih jalan.
-     */
     fun isActive(): Boolean = isRunning
 }
 
-/**
- * Hasil akhir task.
- */
 sealed class TaskResult {
     data class Success(val packageName: String, val appLabel: String) : TaskResult()
     data class Skipped(val packageName: String, val appLabel: String) : TaskResult()
