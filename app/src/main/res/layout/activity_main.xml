@@ -21,9 +21,9 @@
             android:textSize="32sp"
             android:textStyle="bold" />
 
-        <!-- Card 1: Dimmer -->
+        <!-- Card 1: Killer -->
         <LinearLayout
-            android:id="@+id/cardDimmer"
+            android:id="@+id/cardKiller"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
@@ -40,7 +40,7 @@
                 android:background="@drawable/bg_icon_circle"
                 android:contentDescription="@null"
                 android:padding="12dp"
-                android:src="@drawable/ic_dimmer" />
+                android:src="@drawable/ic_killer" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -52,7 +52,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/menu_dimmer_title"
+                    android:text="@string/menu_killer_title"
                     android:textColor="@color/text_primary"
                     android:textSize="17sp"
                     android:textStyle="bold" />
@@ -61,7 +61,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="@string/menu_dimmer_desc"
+                    android:text="@string/menu_killer_desc"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
             </LinearLayout>
@@ -127,9 +127,9 @@
                 android:textSize="24sp" />
         </LinearLayout>
 
-        <!-- Card 3: Killer -->
+        <!-- Card 3: Dimmer -->
         <LinearLayout
-            android:id="@+id/cardKiller"
+            android:id="@+id/cardDimmer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
@@ -146,7 +146,7 @@
                 android:background="@drawable/bg_icon_circle"
                 android:contentDescription="@null"
                 android:padding="12dp"
-                android:src="@drawable/ic_killer" />
+                android:src="@drawable/ic_dimmer" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -158,7 +158,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/menu_killer_title"
+                    android:text="@string/menu_dimmer_title"
                     android:textColor="@color/text_primary"
                     android:textSize="17sp"
                     android:textStyle="bold" />
@@ -167,7 +167,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="@string/menu_killer_desc"
+                    android:text="@string/menu_dimmer_desc"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
             </LinearLayout>
