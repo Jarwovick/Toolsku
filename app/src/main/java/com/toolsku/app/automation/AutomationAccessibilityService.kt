@@ -59,10 +59,19 @@ class AutomationAccessibilityService : AccessibilityService() {
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 val pkg = event.packageName?.toString() ?: return
-                if (pkg in OemProfile.settingsPackages) {
-                    val cls = event.className?.toString() ?: ""
-                    Log.d(TAG, "Settings window: $pkg / $cls")
-                }
+                
+                Log.d(TAG, "Window changed: $pkg")
+                
+                // Track app yang dibuka
+                AppTracker.trackAppOpened(this, pkg)
+            }
+            
+            AccessibilityEvent.TYPE_WINDOWS_CHANGED -> {
+                // Skip
+            }
+            
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
+                // Skip
             }
         }
     }
@@ -81,11 +90,6 @@ class AutomationAccessibilityService : AccessibilityService() {
 
     // ==== QUEUE ====
 
-    /**
-     * Jalankan queue otomasi.
-     *
-     * @param onProgress Callback: (current, total, appLabel)
-     */
     fun runQueue(
         tasks: List<AutomationTask>,
         onProgress: ((current: Int, total: Int, appLabel: String) -> Unit)? = null,
@@ -99,7 +103,6 @@ class AutomationAccessibilityService : AccessibilityService() {
         isRunning = true
         TaskQueue.start(tasks)
 
-        // Wrap: skip packageName, pakai appLabel
         TaskQueue.onProgress = { current, total, _, appLabel ->
             onProgress?.invoke(current, total, appLabel)
         }
