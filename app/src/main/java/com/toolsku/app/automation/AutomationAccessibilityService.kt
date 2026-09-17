@@ -11,7 +11,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.FrameLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -104,15 +103,6 @@ class AutomationAccessibilityService : AccessibilityService() {
                 AppTracker.trackAppOpened(this, pkg)
             }
 
-            AccessibilityEvent.TYPE_WINDOW_ADDED -> {
-                Log.d(TAG, "WINDOW_ADDED: $pkg")
-                AppTracker.trackAppOpened(this, pkg)
-            }
-
-            AccessibilityEvent.TYPE_WINDOW_REMOVED -> {
-                Log.d(TAG, "WINDOW_REMOVED: $pkg")
-            }
-
             AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> {
                 AppTracker.trackAppOpened(this, pkg)
             }
@@ -130,8 +120,7 @@ class AutomationAccessibilityService : AccessibilityService() {
             }
 
             else -> {
-                // Event lain — skip, tapi log kalau penting
-                // Log.d(TAG, "Event type ${event.eventType}: $pkg")
+                // Event lain — skip
             }
         }
     }
