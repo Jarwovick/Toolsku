@@ -40,16 +40,16 @@ object AppTracker {
                             isClosed = false
                         )
                     )
-                    Log.d(TAG, "New ${if (isSystem) "system" else "user"} app: $packageName")
+                    Log.d(TAG, "New ${if (isSystem) "SYSTEM" else "USER"} app: $packageName")
                 } else {
-                    // Reset isClosed ketika app dibuka lagi
+                    // Reset isClosed saat app dibuka kembali
                     dao.upsert(
                         existing.copy(
                             lastUsed = System.currentTimeMillis(),
                             isClosed = false
                         )
                     )
-                    Log.d(TAG, "Updated app: $packageName (isClosed reset)")
+                    Log.d(TAG, "Updated app: $packageName")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to track: $packageName", e)
@@ -120,13 +120,13 @@ object AppTracker {
 
     /**
      * Cek apakah app harus di-skip.
-     * System apps BOLEH di-track kalau punya launcher (bisa dibuka user).
+     * ⭐ SYSTEM APPS DI-TRACK juga — jangan skip.
      */
     private fun shouldSkip(context: Context, packageName: String): Boolean {
         // Skip app sendiri
         if (packageName == context.packageName) return true
 
-        // Skip system UI, launcher, dll
+        // Skip system UI, launcher, dll (DANGEROUS)
         if (packageName in SKIP_PACKAGES) return true
 
         // Skip launcher
@@ -138,10 +138,10 @@ object AppTracker {
         // Skip app yang di-exception
         if (Prefs.isException(packageName)) return true
 
-        // Skip DANGEROUS system apps
+        // ⭐ Skip HANYA yang DANGEROUS system apps
         if (SystemApps.isDangerousSystemApp(packageName)) return true
 
-        // Cek launch intent — kalau TIDAK punya, skip
+        // Cek launch intent — skip app tanpa UI
         return try {
             val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
             launchIntent == null
@@ -159,6 +159,8 @@ object AppTracker {
         "com.android.providers.contacts",
         "com.android.providers.telephony",
         "com.android.providers.calendar",
-        "com.android.providers.downloads"
+        "com.android.providers.downloads",
+        "com.android.providers.userdictionary",
+        "com.android.providers.blockednumber"
     )
 }
