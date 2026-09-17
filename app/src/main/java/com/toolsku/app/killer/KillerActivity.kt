@@ -28,6 +28,7 @@ import com.toolsku.app.automation.AppTracker
 import com.toolsku.app.automation.AutomationAccessibilityService
 import com.toolsku.app.automation.AutomationTask
 import com.toolsku.app.automation.OemProfile
+import com.toolsku.app.automation.QueueStats
 import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.Prefs
@@ -364,10 +365,14 @@ class KillerActivity : AppCompatActivity() {
 
     /**
      * Force kembali ke KillerActivity.
-     * `or` di AKHIR baris untuk multi-line.
+     * Hapus task Settings (App Info) supaya Back keluar dari Toolsku.
      */
     private fun forceBackToKiller() {
         try {
+            // 1. Kill Settings task
+            killSettingsTask()
+
+            // 2. Force back ke Killer
             val intent = Intent(this, KillerActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP or
@@ -383,8 +388,36 @@ class KillerActivity : AppCompatActivity() {
     }
 
     /**
+     * Kill task Settings (App Info).
+     * Supaya user tekan Back keluar dari Toolsku, bukan buka App Info lagi.
+     */
+    private fun killSettingsTask() {
+        try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val tasks = am.appTasks
+            for (task in tasks) {
+                try {
+                    val taskInfo = task.taskInfo
+                    val baseIntent = taskInfo?.baseIntent
+                    val pkg = baseIntent?.component?.packageName
+
+                    if (pkg == "com.android.settings" ||
+                        pkg == "com.coloros.settings" ||
+                        pkg == "com.oppo.settings") {
+                        task.finishAndRemoveTask()
+                        Log.i(TAG, "Killed Settings task: $pkg")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to kill task", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "killSettingsTask failed", e)
+        }
+    }
+
+    /**
      * Mark app yang di-kill sebagai "closed" di database.
-     * Semua app (user + system) di-mark di DB.
      */
     private fun markAsClosed(apps: List<KillerAppItem>) {
         lifecycleScope.launch {
