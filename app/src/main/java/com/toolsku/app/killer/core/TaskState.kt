@@ -20,9 +20,6 @@ data class TaskState(
     }
 }
 
-/**
- * Alasan task dibatalkan — tiru dari `aw` Baxa.
- */
 enum class CancelReason {
     NONE,
     USER_CANCELLED,
