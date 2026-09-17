@@ -49,7 +49,6 @@ object AppRepository {
 
     /**
      * Ambil daftar app di exception list.
-     * HANYA app yang masih terinstall.
      */
     suspend fun getExceptionApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -79,7 +78,6 @@ object AppRepository {
                             isException = true
                         )
                     )
-                    Log.d(TAG, "Found: $pkg — $label")
                 } catch (e: PackageManager.NameNotFoundException) {
                     Log.w(TAG, "SKIP (not installed): $pkg")
                 }
@@ -122,38 +120,74 @@ object AppRepository {
         }
 
     /**
-     * Ambil safe system apps.
+     * Ambil safe system apps yang RUNNING (dari DB).
+     * Fallback ke live query kalau DB kosong.
      */
     suspend fun getSafeSystemApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
-            val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
             val result = mutableListOf<AppInfo>()
-            val ourPackage = context.packageName
 
-            for (app in packages) {
-                if (app.packageName == ourPackage) continue
-                if (!SystemApps.isSafeSystemApp(app.packageName)) continue
-                if (Prefs.isException(app.packageName)) continue
+            try {
+                val dao = DatabaseProvider.runningAppDao()
+                val entities = dao.getRunningSystemApps()
 
-                result.add(
-                    AppInfo(
-                        packageName = app.packageName,
-                        label = pm.getApplicationLabel(app).toString(),
-                        icon = try { pm.getApplicationIcon(app) } catch (e: Exception) { null },
-                        isSystem = true,
-                        isException = false
+                Log.i(TAG, "DB system apps: ${entities.size}")
+
+                if (entities.isNotEmpty()) {
+                    for (entity in entities) {
+                        if (Prefs.isException(entity.packageName)) continue
+
+                        try {
+                            val appInfo = pm.getApplicationInfo(entity.packageName, 0)
+                            result.add(
+                                AppInfo(
+                                    packageName = entity.packageName,
+                                    label = pm.getApplicationLabel(appInfo).toString(),
+                                    icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
+                                    isSystem = true,
+                                    isException = false
+                                )
+                            )
+                        } catch (e: Exception) {
+                            dao.delete(entity.packageName)
+                        }
+                    }
+                    result.sortBy { it.label.lowercase() }
+                    return@withContext result
+                }
+
+                // Fallback: live query safe system apps
+                Log.i(TAG, "DB empty — using fallback for system apps")
+                val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                val ourPackage = context.packageName
+
+                for (app in packages) {
+                    if (app.packageName == ourPackage) continue
+                    if (!SystemApps.isSafeSystemApp(app.packageName)) continue
+                    if (Prefs.isException(app.packageName)) continue
+
+                    result.add(
+                        AppInfo(
+                            packageName = app.packageName,
+                            label = pm.getApplicationLabel(app).toString(),
+                            icon = try { pm.getApplicationIcon(app) } catch (e: Exception) { null },
+                            isSystem = true,
+                            isException = false
+                        )
                     )
-                )
-            }
+                }
 
-            result.sortBy { it.label.lowercase() }
-            result
+                result.sortBy { it.label.lowercase() }
+                result
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get system apps", e)
+                emptyList()
+            }
         }
 
     /**
-     * Ambil daftar app RUNNING dari DATABASE.
-     * App yang pernah dibuka + belum ditutup + belum auto-restart + belum unclosable.
+     * Ambil daftar app USER yang RUNNING (dari DB).
      */
     suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
@@ -161,9 +195,9 @@ object AppRepository {
 
         try {
             val dao = DatabaseProvider.runningAppDao()
-            val entities = dao.getRunningApps()
+            val entities = dao.getRunningUserApps()
 
-            Log.i(TAG, "DB running apps: ${entities.size}")
+            Log.i(TAG, "DB user apps: ${entities.size}")
 
             for (entity in entities) {
                 if (SystemApps.isDangerousSystemApp(entity.packageName)) continue
@@ -171,11 +205,6 @@ object AppRepository {
 
                 try {
                     val appInfo = pm.getApplicationInfo(entity.packageName, 0)
-                    val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-
-                    // Skip system apps — mereka di-handle oleh getSafeSystemApps
-                    if (isSystem) continue
-
                     result.add(
                         AppInfo(
                             packageName = entity.packageName,
@@ -186,7 +215,6 @@ object AppRepository {
                         )
                     )
                 } catch (e: Exception) {
-                    // App sudah uninstall — hapus dari DB
                     dao.delete(entity.packageName)
                 }
             }
@@ -195,7 +223,7 @@ object AppRepository {
         }
 
         result.sortBy { it.label.lowercase() }
-        Log.i(TAG, "Final running apps: ${result.size}")
+        Log.i(TAG, "Final user running apps: ${result.size}")
         result
     }
 
