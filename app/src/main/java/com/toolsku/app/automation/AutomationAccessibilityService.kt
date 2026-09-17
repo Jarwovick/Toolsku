@@ -11,6 +11,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.FrameLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -29,12 +30,16 @@ class AutomationAccessibilityService : AccessibilityService() {
         const val MODE_CLEANER = "cleaner"
 
         var onStopClick: (() -> Unit)? = null
+
+        // Debounce window check
+        private const val WINDOW_CHECK_DEBOUNCE_MS = 1000L
     }
 
     private lateinit var executor: TaskExecutor
     private val handler = Handler(Looper.getMainLooper())
     private var isRunning = false
 
+    // Overlay
     private lateinit var windowManager: WindowManager
     private var overlayView: View? = null
     private lateinit var progressCircle: ProgressBar
@@ -45,35 +50,140 @@ class AutomationAccessibilityService : AccessibilityService() {
     private lateinit var tvSubtitle: TextView
     private var currentMode: String = MODE_KILLER
 
+    // Debounce
+    private var lastWindowCheckTime = 0L
+
+    // Skip packages (SystemUI, launcher, keyboard)
+    private val skipPackages = setOf(
+        "com.android.systemui",
+        "com.coloros.systemui",
+        "com.android.launcher",
+        "com.coloros.launcher",
+        "com.oppo.launcher",
+        "com.realme.launcher",
+        "com.android.inputmethod",
+        "com.google.android.inputmethod",
+        "com.baidu.input"
+    )
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
         executor = TaskExecutor(this, this)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        Log.i(TAG, "Accessibility Service connected")
+        Log.i(TAG, "Accessibility Service connected (typeAllMask)")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
+        val pkg = event.packageName?.toString() ?: return
+
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                val pkg = event.packageName?.toString() ?: return
-                
-                Log.d(TAG, "Window changed: $pkg")
-                
-                // Track app yang dibuka
+                Log.d(TAG, "STATE_CHANGED: $pkg")
                 AppTracker.trackAppOpened(this, pkg)
             }
-            
+
             AccessibilityEvent.TYPE_WINDOWS_CHANGED -> {
+                Log.d(TAG, "WINDOWS_CHANGED: $pkg")
+                checkActiveWindows()
+            }
+
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
+                // Skip — terlalu banyak event
+            }
+
+            AccessibilityEvent.TYPE_VIEW_FOCUSED -> {
+                Log.d(TAG, "VIEW_FOCUSED: $pkg")
+                AppTracker.trackAppOpened(this, pkg)
+            }
+
+            AccessibilityEvent.TYPE_VIEW_CLICKED -> {
+                Log.d(TAG, "VIEW_CLICKED: $pkg")
+                AppTracker.trackAppOpened(this, pkg)
+            }
+
+            AccessibilityEvent.TYPE_WINDOW_ADDED -> {
+                Log.d(TAG, "WINDOW_ADDED: $pkg")
+                AppTracker.trackAppOpened(this, pkg)
+            }
+
+            AccessibilityEvent.TYPE_WINDOW_REMOVED -> {
+                Log.d(TAG, "WINDOW_REMOVED: $pkg")
+            }
+
+            AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> {
+                AppTracker.trackAppOpened(this, pkg)
+            }
+
+            AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
+                // Skip — banyak event
+            }
+
+            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> {
                 // Skip
             }
-            
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
+
+            AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED -> {
                 // Skip
+            }
+
+            else -> {
+                // Event lain — skip, tapi log kalau penting
+                // Log.d(TAG, "Event type ${event.eventType}: $pkg")
             }
         }
+    }
+
+    /**
+     * Cek semua window aktif → track app yang muncul.
+     * Dipanggil saat TYPE_WINDOWS_CHANGED.
+     * Debounce 1 detik untuk hindari spam.
+     */
+    private fun checkActiveWindows() {
+        val now = System.currentTimeMillis()
+        if (now - lastWindowCheckTime < WINDOW_CHECK_DEBOUNCE_MS) {
+            return  // Skip — debounce
+        }
+        lastWindowCheckTime = now
+
+        try {
+            val windows = windows ?: return
+            if (windows.isEmpty()) return
+
+            Log.d(TAG, "Checking ${windows.size} windows")
+
+            for (window in windows) {
+                try {
+                    val root = window.root ?: continue
+                    val pkg = root.packageName?.toString() ?: continue
+
+                    // Skip SystemUI, launcher, keyboard
+                    if (isSkipPackage(pkg)) continue
+
+                    // Track app yang muncul di window
+                    Log.d(TAG, "Window app: $pkg")
+                    AppTracker.trackAppOpened(this, pkg)
+
+                } catch (e: Exception) {
+                    // Skip window yang tidak bisa diakses
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "checkActiveWindows failed", e)
+        }
+    }
+
+    /**
+     * Cek apakah package harus di-skip.
+     */
+    private fun isSkipPackage(pkg: String): Boolean {
+        if (pkg in skipPackages) return true
+        if (pkg.contains("launcher")) return true
+        if (pkg.contains("inputmethod")) return true
+        if (pkg.contains("systemui")) return true
+        return false
     }
 
     override fun onInterrupt() {
