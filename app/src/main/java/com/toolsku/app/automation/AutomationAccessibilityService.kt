@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.toolsku.app.core.AppTracker
 import com.toolsku.app.killer.engine.QueueManager
 import com.toolsku.app.killer.engine.QueueResult
 import com.toolsku.app.killer.overlay.KillerOverlayManager
@@ -17,22 +18,13 @@ class AutomationAccessibilityService : AccessibilityService() {
         var instance: AutomationAccessibilityService? = null
             private set
 
-        /**
-         * Callback stop — kompatibilitas dengan Cleaner & Shortcut lama.
-         */
         @Volatile
         var onStopClick: (() -> Unit)? = null
     }
 
-    /**
-     * Queue Manager untuk Killer.
-     */
     var queueManager: QueueManager? = null
         private set
 
-    /**
-     * Overlay Manager untuk Killer.
-     */
     var overlayManager: KillerOverlayManager? = null
         private set
 
@@ -55,11 +47,13 @@ class AutomationAccessibilityService : AccessibilityService() {
             null
         }
 
+        // ⭐ 1. TRACK APP — isi database
         if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            Log.d(TAG, "Event: $pkg / $cls")
+            Log.d(TAG, "Window changed: $pkg")
+            AppTracker.trackAppOpened(this, pkg)
         }
 
-        // Forward ke QueueManager (Killer)
+        // ⭐ 2. FORWARD KE KILLER — otomasi
         queueManager?.handleEvent(pkg, cls, eventType, source)
     }
 
@@ -79,12 +73,9 @@ class AutomationAccessibilityService : AccessibilityService() {
     }
 
     // ============================================
-    // KILLER — Queue Manager
+    // KILLER
     // ============================================
 
-    /**
-     * Mulai kill apps.
-     */
     fun startKillQueue(
         apps: List<QueueManager.AppToKill>,
         onProgress: (current: Int, total: Int, appLabel: String) -> Unit,
@@ -95,14 +86,12 @@ class AutomationAccessibilityService : AccessibilityService() {
             return false
         }
 
-        // Setup overlay
         overlayManager?.show()
         overlayManager?.update(0, apps.size, "")
         overlayManager?.onStopClick = {
             cancelQueue()
         }
 
-        // Buat queue manager
         queueManager = QueueManager(
             context = this,
             onProgress = { current, total, appLabel ->
@@ -121,9 +110,6 @@ class AutomationAccessibilityService : AccessibilityService() {
         return true
     }
 
-    /**
-     * Cancel queue.
-     */
     fun cancelQueue() {
         Log.i(TAG, "Cancel queue")
         queueManager?.cancel()
@@ -132,33 +118,21 @@ class AutomationAccessibilityService : AccessibilityService() {
         overlayManager?.onStopClick = null
     }
 
-    /**
-     * Sembunyikan overlay.
-     */
     fun hideOverlay() {
         Log.i(TAG, "Hide overlay")
         overlayManager?.hide()
         overlayManager?.onStopClick = null
     }
 
-    /**
-     * Tampilkan overlay.
-     */
     fun showOverlay(current: Int, total: Int, appLabel: String, mode: String) {
         Log.i(TAG, "Show overlay: mode=$mode")
         overlayManager?.show()
         overlayManager?.update(current, total, appLabel)
     }
 
-    /**
-     * Update overlay.
-     */
     fun updateOverlay(current: Int, total: Int, appLabel: String) {
         overlayManager?.update(current, total, appLabel)
     }
 
-    /**
-     * Cek apakah ada queue aktif.
-     */
     fun isKillQueueActive(): Boolean = queueManager?.isActive() == true
 }
