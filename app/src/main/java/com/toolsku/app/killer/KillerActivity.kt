@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.ImageButton
@@ -30,10 +31,15 @@ import com.toolsku.app.automation.OemProfile
 import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.Prefs
+import com.toolsku.app.core.db.DatabaseProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class KillerActivity : AppCompatActivity() {
+
+    companion object {
+        private const val TAG = "KillerActivity"
+    }
 
     private lateinit var adapter: KillerAdapter
     private lateinit var tvHeaderTitle: TextView
@@ -112,6 +118,25 @@ class KillerActivity : AppCompatActivity() {
         updateRamInfo()
         if (!isProcessing) {
             loadApps()
+        }
+    }
+
+    /**
+     * Handle Intent baru — saat forceBackToKiller dipanggil.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+
+        if (intent.getBooleanExtra("refresh_after_kill", false)) {
+            Log.i(TAG, "onNewIntent: refresh after kill")
+            // Reset isProcessing karena kita baru balik dari kill
+            isProcessing = false
+            updateButtonCount()
+
+            // Refresh daftar
+            loadApps()
+            updateRamInfo()
         }
     }
 
@@ -309,6 +334,7 @@ class KillerActivity : AppCompatActivity() {
             steps.add(ActionStep.Wait(200))
             steps.add(ActionStep.ClickByText(OemProfile.forceStopConfirmLabels))
             steps.add(ActionStep.Wait(200))
+            // Cukup 1x Back — sisanya di-force oleh Intent
             steps.add(ActionStep.Back)
             steps.add(ActionStep.Wait(150))
             AutomationTask(app.packageName, app.label, steps)
@@ -321,6 +347,7 @@ class KillerActivity : AppCompatActivity() {
             },
             onComplete = { stats ->
                 runOnUiThread {
+                    // 1. Sembunyikan overlay
                     service.hideOverlay()
                     AutomationAccessibilityService.onStopClick = null
                     isProcessing = false
@@ -332,11 +359,64 @@ class KillerActivity : AppCompatActivity() {
                         Toast.LENGTH_SHORT
                     ).show()
 
-                    // Cek auto-restart setelah 3 detik
-                    checkAutoRestart(apps)
+                    // 2. Mark app sebagai closed di DB
+                    markAsClosed(apps)
+
+                    // 3. ⭐ FORCE buka KillerActivity
+                    forceBackToKiller()
+
+                    // 4. Setelah 4 detik, cek auto-restart
+                    handler.postDelayed({
+                        checkAutoRestart(apps)
+                    }, 4000)
                 }
             }
         )
+    }
+
+    /**
+     * Force kembali ke KillerActivity — hapus semua activity di atasnya.
+     */
+    private fun forceBackToKiller() {
+        try {
+            val intent = Intent(this, KillerActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP 
+                        or Intent.FLAG_ACTIVITY_SINGLE_TOP 
+                        or Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra("refresh_after_kill", true)
+            }
+            startActivity(intent)
+            Log.i(TAG, "Force back to Killer via Intent")
+        } catch (e: Exception) {
+            Log.e(TAG, "forceBackToKiller failed", e)
+            finish()
+        }
+    }
+
+    /**
+     * Mark app yang di-kill sebagai "closed" di database.
+     */
+    private fun markAsClosed(apps: List<KillerAppItem>) {
+        lifecycleScope.launch {
+            try {
+                val dao = DatabaseProvider.runningAppDao()
+                val packages = apps.map { it.packageName }
+
+                Log.i(TAG, "Marking ${packages.size} apps as closed")
+
+                packages.forEach { pkg ->
+                    dao.markClosed(pkg)
+                }
+
+                Log.i(TAG, "Marked as closed successfully")
+
+                // Refresh daftar setelah 500ms
+                delay(500)
+                loadApps()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to mark as closed", e)
+            }
+        }
     }
 
     /**
@@ -344,30 +424,33 @@ class KillerActivity : AppCompatActivity() {
      */
     private fun checkAutoRestart(killedApps: List<KillerAppItem>) {
         lifecycleScope.launch {
-            delay(3000)  // Tunggu 3 detik
+            try {
+                delay(3000)
 
-            val currentRunning = AppRepository.getRunningApps(this@KillerActivity)
-            val runningPackages = currentRunning.map { it.packageName }.toSet()
+                val dao = DatabaseProvider.runningAppDao()
+                var autoRestartCount = 0
 
-            var autoRestartCount = 0
-            killedApps.forEach { app ->
-                if (runningPackages.contains(app.packageName)) {
-                    // App ini restart sendiri
-                    AppTracker.trackAutoRestart(app.packageName)
-                    autoRestartCount++
+                killedApps.forEach { app ->
+                    val entity = dao.getApp(app.packageName)
+                    if (entity != null && !entity.isClosed) {
+                        dao.markAutoRestarted(app.packageName)
+                        autoRestartCount++
+                        Log.i(TAG, "Auto-restart: ${app.packageName}")
+                    }
                 }
-            }
 
-            if (autoRestartCount > 0) {
-                Toast.makeText(
-                    this@KillerActivity,
-                    "$autoRestartCount app restart otomatis",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
+                if (autoRestartCount > 0) {
+                    Toast.makeText(
+                        this@KillerActivity,
+                        "$autoRestartCount app restart otomatis",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
 
-            // Refresh daftar
-            loadApps()
+                loadApps()
+            } catch (e: Exception) {
+                Log.e(TAG, "checkAutoRestart failed", e)
+            }
         }
     }
 }
