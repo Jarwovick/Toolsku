@@ -11,14 +11,6 @@ import com.toolsku.app.killer.action.EmptyAction
 import com.toolsku.app.killer.action.ForceStopAction
 import com.toolsku.app.killer.core.StepResult
 
-/**
- * Step: Buka App Info.
- * Tiru dari `cd1` Baxa.
- *
- * Action:
- * 1. EmptyAction (placeholder)
- * 2. ForceStopAction (klik "Paksa berhenti")
- */
 class OpenAppInfoStep(
     private val context: Context,
     private val packageName: String
@@ -32,7 +24,6 @@ class OpenAppInfoStep(
 
     init {
         currentPackage = packageName
-        // Tambah actions
         actions.add(EmptyAction(this))
         actions.add(ForceStopAction(this, this))
     }
@@ -41,7 +32,6 @@ class OpenAppInfoStep(
         Log.i(TAG, "Opening App Info for $packageName")
 
         return try {
-            // Cek apakah app sudah stopped
             val appInfo = context.packageManager.getApplicationInfo(packageName, 0)
             val isStopped = (appInfo.flags and ApplicationInfo.FLAG_STOPPED) != 0
 
@@ -50,7 +40,6 @@ class OpenAppInfoStep(
                 return StepResult.skipTask()
             }
 
-            // Buka App Info
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = Uri.parse("package:$packageName")
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
