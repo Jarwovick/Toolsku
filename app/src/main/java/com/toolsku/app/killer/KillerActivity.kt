@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
@@ -21,12 +23,14 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.toolsku.app.R
 import com.toolsku.app.automation.ActionStep
+import com.toolsku.app.automation.AppTracker
 import com.toolsku.app.automation.AutomationAccessibilityService
 import com.toolsku.app.automation.AutomationTask
 import com.toolsku.app.automation.OemProfile
 import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.Prefs
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class KillerActivity : AppCompatActivity() {
@@ -45,6 +49,7 @@ class KillerActivity : AppCompatActivity() {
     private lateinit var tvLoading: TextView
 
     private var isProcessing = false
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -306,7 +311,6 @@ class KillerActivity : AppCompatActivity() {
             steps.add(ActionStep.Wait(200))
             steps.add(ActionStep.Back)
             steps.add(ActionStep.Wait(150))
-            // Pass appLabel
             AutomationTask(app.packageName, app.label, steps)
         }
 
@@ -321,14 +325,49 @@ class KillerActivity : AppCompatActivity() {
                     AutomationAccessibilityService.onStopClick = null
                     isProcessing = false
                     updateButtonCount()
-                    loadApps()
+
                     Toast.makeText(
                         this,
                         "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
-                        Toast.LENGTH_LONG
+                        Toast.LENGTH_SHORT
                     ).show()
+
+                    // Cek auto-restart setelah 3 detik
+                    checkAutoRestart(apps)
                 }
             }
         )
+    }
+
+    /**
+     * Cek app yang auto-restart setelah kill.
+     */
+    private fun checkAutoRestart(killedApps: List<KillerAppItem>) {
+        lifecycleScope.launch {
+            delay(3000)  // Tunggu 3 detik
+
+            val currentRunning = AppRepository.getRunningApps(this@KillerActivity)
+            val runningPackages = currentRunning.map { it.packageName }.toSet()
+
+            var autoRestartCount = 0
+            killedApps.forEach { app ->
+                if (runningPackages.contains(app.packageName)) {
+                    // App ini restart sendiri
+                    AppTracker.trackAutoRestart(app.packageName)
+                    autoRestartCount++
+                }
+            }
+
+            if (autoRestartCount > 0) {
+                Toast.makeText(
+                    this@KillerActivity,
+                    "$autoRestartCount app restart otomatis",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+
+            // Refresh daftar
+            loadApps()
+        }
     }
 }
