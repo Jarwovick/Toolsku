@@ -13,10 +13,6 @@ object CacheSizeFetcher {
 
     private const val TAG = "CacheSizeFetcher"
 
-    /**
-     * Ambil ukuran cache per package.
-     * Return Map<packageName, cacheSizeInBytes>
-     */
     suspend fun getCacheSizes(
         context: Context,
         packages: List<String>
@@ -24,11 +20,15 @@ object CacheSizeFetcher {
         val result = mutableMapOf<String, Long>()
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            Log.w(TAG, "SDK < O, cannot get cache sizes")
             return@withContext result
         }
 
         val storageStatsManager = context.getSystemService(Context.STORAGE_STATS_SERVICE) as? StorageStatsManager
-            ?: return@withContext result
+        if (storageStatsManager == null) {
+            Log.e(TAG, "StorageStatsManager is null")
+            return@withContext result
+        }
 
         val storageManager = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
 
@@ -49,9 +49,14 @@ object CacheSizeFetcher {
                     0L
                 }
 
-                result[pkg] = internalCache + externalCache
+                val total = internalCache + externalCache
+                result[pkg] = total
+
+                // Log untuk debug
+                if (total > 0) {
+                    Log.d(TAG, "$pkg: ${total / (1024 * 1024)} MB")
+                }
             } catch (e: Exception) {
-                // ⭐ Skip error — jangan crash
                 Log.w(TAG, "Skip $pkg: ${e.message}")
                 result[pkg] = 0L
             }
