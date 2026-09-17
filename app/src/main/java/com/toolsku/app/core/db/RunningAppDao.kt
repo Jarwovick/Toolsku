@@ -12,7 +12,7 @@ interface RunningAppDao {
     suspend fun upsert(entity: RunningAppEntity)
 
     /**
-     * Ambil semua running apps USER (yang belum ditutup + belum auto-restart).
+     * Ambil running USER apps (belum ditutup, belum auto-restart, belum unclosable).
      */
     @Query("""
         SELECT * FROM running_apps 
@@ -24,8 +24,7 @@ interface RunningAppDao {
     suspend fun getRunningUserApps(): List<RunningAppEntity>
 
     /**
-     * Ambil semua running apps SYSTEM (yang belum ditutup).
-     * System apps yang belum pernah di-track → tidak muncul (di-handle fallback).
+     * Ambil running SYSTEM apps (belum ditutup, belum auto-restart, belum unclosable).
      */
     @Query("""
         SELECT * FROM running_apps 
@@ -37,7 +36,7 @@ interface RunningAppDao {
     suspend fun getRunningSystemApps(): List<RunningAppEntity>
 
     /**
-     * Ambil semua running apps (untuk fallback).
+     * Ambil semua running apps (user + system).
      */
     @Query("""
         SELECT * FROM running_apps 
@@ -75,4 +74,7 @@ interface RunningAppDao {
 
     @Query("SELECT * FROM running_apps")
     suspend fun getAll(): List<RunningAppEntity>
+
+    @Query("DELETE FROM running_apps")
+    suspend fun deleteAll()
 }
