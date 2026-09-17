@@ -1,7 +1,5 @@
 package com.toolsku.app.cleaner
 
-import android.app.ActivityManager
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -113,15 +111,17 @@ class CleanerActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                val userApps = AppRepository.getInstalledApps(this@CleanerActivity, includeSystem = false)
-                val systemApps = AppRepository.getSafeSystemApps(this@CleanerActivity)
-                val allApps = (userApps + systemApps).distinctBy { it.packageName }
+                // ⭐ Pakai method Cleaner — semua app kecuali dangerous, abaikan exception
+                val allApps = AppRepository.getAllAppsForCleaner(this@CleanerActivity)
+                Log.i(TAG, "Total apps to scan: ${allApps.size}")
 
+                // Query cache size
                 val cacheSizes = CacheSizeFetcher.getCacheSizes(
                     this@CleanerActivity,
                     allApps.map { it.packageName }
                 )
 
+                // Filter cache >= 10 MB
                 val items = allApps.map { app ->
                     CleanerAppItem(
                         packageName = app.packageName,
@@ -134,6 +134,8 @@ class CleanerActivity : AppCompatActivity() {
                 }
                     .filter { it.cacheSize >= MIN_CACHE_SIZE }
                     .sortedByDescending { it.cacheSize }
+
+                Log.i(TAG, "Apps with cache >= 10 MB: ${items.size}")
 
                 adapter.submitList(items)
                 updateTotals(items)
@@ -149,6 +151,7 @@ class CleanerActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 tvLoading.visibility = View.VISIBLE
                 tvLoading.text = "Error: ${e.message}"
+                Log.e(TAG, "loadApps failed", e)
             }
         }
     }
@@ -267,10 +270,8 @@ class CleanerActivity : AppCompatActivity() {
                         Toast.LENGTH_SHORT
                     ).show()
 
-                    // ⭐ FORCE back ke Cleaner
                     forceBackToCleaner()
 
-                    // Refresh setelah 1 detik
                     handler.postDelayed({
                         loadApps()
                     }, 1000)
@@ -279,16 +280,8 @@ class CleanerActivity : AppCompatActivity() {
         )
     }
 
-    /**
-     * Force kembali ke CleanerActivity.
-     * Hapus task Settings (App Info) supaya Back keluar dari Toolsku.
-     */
     private fun forceBackToCleaner() {
         try {
-            // 1. Kill Settings task
-            killSettingsTask()
-
-            // 2. Force back ke Cleaner
             val intent = Intent(this, CleanerActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP or
@@ -300,35 +293,6 @@ class CleanerActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "forceBackToCleaner failed", e)
             finish()
-        }
-    }
-
-    /**
-     * Kill task Settings (App Info).
-     * Supaya user tekan Back keluar dari Toolsku, bukan buka App Info lagi.
-     */
-    private fun killSettingsTask() {
-        try {
-            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val tasks = am.appTasks
-            for (task in tasks) {
-                try {
-                    val taskInfo = task.taskInfo
-                    val baseIntent = taskInfo?.baseIntent
-                    val pkg = baseIntent?.component?.packageName
-
-                    if (pkg == "com.android.settings" ||
-                        pkg == "com.coloros.settings" ||
-                        pkg == "com.oppo.settings") {
-                        task.finishAndRemoveTask()
-                        Log.i(TAG, "Killed Settings task: $pkg")
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to kill task", e)
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "killSettingsTask failed", e)
         }
     }
 }
