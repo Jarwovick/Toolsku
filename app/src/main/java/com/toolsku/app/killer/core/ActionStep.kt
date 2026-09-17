@@ -1,6 +1,7 @@
 package com.toolsku.app.killer.core
 
 import android.view.accessibility.AccessibilityNodeInfo
+import com.toolsku.app.killer.engine.TaskStateMachine
 
 /**
  * Interface untuk satu step.
@@ -26,23 +27,11 @@ interface ActionStep {
 
     fun pause()
 
-    /**
-     * Set parent task (untuk callback).
-     */
     fun setParentTask(task: TaskStateMachine)
 
-    /**
-     * Set current window id.
-     */
     fun setCurrentWindowId(windowId: Int)
 
-    /**
-     * Get current window id.
-     */
     fun getCurrentWindowId(): Int
 
-    /**
-     * Handle state machine result — callback dari parent.
-     */
     fun onResult(result: StepResult)
 }
