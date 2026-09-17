@@ -21,6 +21,7 @@ import com.toolsku.app.automation.ActionStep
 import com.toolsku.app.automation.AutomationAccessibilityService
 import com.toolsku.app.automation.AutomationTask
 import com.toolsku.app.automation.OemProfile
+import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.CacheSizeFetcher
 import kotlinx.coroutines.launch
@@ -111,31 +112,35 @@ class CleanerActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                // ⭐ Pakai method Cleaner — semua app kecuali dangerous, abaikan exception
-                val allApps = AppRepository.getAllAppsForCleaner(this@CleanerActivity)
-                Log.i(TAG, "Total apps to scan: ${allApps.size}")
+                Log.i(TAG, "Loading apps...")
 
-                // Query cache size
-                val cacheSizes = CacheSizeFetcher.getCacheSizes(
+                // ⭐ Pakai getAllAppsForCleaner — TIDAK ada exception filter
+                val allApps: List<AppInfo> = AppRepository.getAllAppsForCleaner(this@CleanerActivity)
+                Log.i(TAG, "Total apps: ${allApps.size}")
+
+                // Hitung cache size
+                val cacheSizes: Map<String, Long> = CacheSizeFetcher.getCacheSizes(
                     this@CleanerActivity,
                     allApps.map { it.packageName }
                 )
+                Log.i(TAG, "Cache sizes: ${cacheSizes.size}")
 
                 // Filter cache >= 10 MB
-                val items = allApps.map { app ->
-                    CleanerAppItem(
-                        packageName = app.packageName,
-                        label = app.label,
-                        icon = app.icon,
-                        cacheSize = cacheSizes[app.packageName] ?: 0L,
-                        isSystem = app.isSystem,
-                        selected = true
-                    )
-                }
+                val items: List<CleanerAppItem> = allApps
+                    .map { app ->
+                        CleanerAppItem(
+                            packageName = app.packageName,
+                            label = app.label,
+                            icon = app.icon,
+                            cacheSize = cacheSizes[app.packageName] ?: 0L,
+                            isSystem = app.isSystem,
+                            selected = true
+                        )
+                    }
                     .filter { it.cacheSize >= MIN_CACHE_SIZE }
                     .sortedByDescending { it.cacheSize }
 
-                Log.i(TAG, "Apps with cache >= 10 MB: ${items.size}")
+                Log.i(TAG, "Apps with cache >= 10MB: ${items.size}")
 
                 adapter.submitList(items)
                 updateTotals(items)
@@ -148,10 +153,12 @@ class CleanerActivity : AppCompatActivity() {
                 } else {
                     tvLoading.visibility = View.GONE
                 }
+
             } catch (e: Exception) {
+                Log.e(TAG, "loadApps failed", e)
                 tvLoading.visibility = View.VISIBLE
                 tvLoading.text = "Error: ${e.message}"
-                Log.e(TAG, "loadApps failed", e)
+                // ⭐ JANGAN finish() — biar user lihat error
             }
         }
     }
