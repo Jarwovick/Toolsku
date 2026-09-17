@@ -23,16 +23,14 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.toolsku.app.R
+import com.toolsku.app.automation.AutomationAccessibilityService
 import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.Prefs
 import com.toolsku.app.core.db.DatabaseProvider
+import com.toolsku.app.killer.engine.QueueManager
 import kotlinx.coroutines.launch
 
-/**
- * Halaman Killer.
- * Placeholder — otomasi akan diaktifkan di Fase K7.
- */
 class KillerActivity : AppCompatActivity() {
 
     companion object {
@@ -160,6 +158,8 @@ class KillerActivity : AppCompatActivity() {
         )
     }
 
+    // ==== RAM ====
+
     private fun updateRamInfo() {
         val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val mi = ActivityManager.MemoryInfo()
@@ -180,6 +180,8 @@ class KillerActivity : AppCompatActivity() {
     private fun updateLaunchedAppsCount(count: Int) {
         tvLaunchedApps.text = count.toString()
     }
+
+    // ==== UI ====
 
     private fun updateButtonCount() {
         val count = adapter.getAppItems().count { it.selected }
@@ -254,6 +256,8 @@ class KillerActivity : AppCompatActivity() {
         loadApps()
     }
 
+    // ==== KILL ====
+
     private fun startKilling() {
         val selected = adapter.getAppItems().filter { it.selected }
         if (selected.isEmpty()) {
@@ -261,7 +265,76 @@ class KillerActivity : AppCompatActivity() {
             return
         }
 
-        // TODO Fase K7: Aktifkan otomasi
-        Toast.makeText(this, "Fitur Killer akan diaktifkan di Fase K7", Toast.LENGTH_LONG).show()
+        val service = AutomationAccessibilityService.instance
+        if (service == null) {
+            Toast.makeText(this, R.string.killer_test_no_accessibility, Toast.LENGTH_LONG).show()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Hentikan ${selected.size} aplikasi?")
+            .setMessage("Aplikasi akan dihentikan paksa.")
+            .setPositiveButton("Hentikan") { _, _ -> executeKill(selected) }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    private fun executeKill(apps: List<KillerAppItem>) {
+        isProcessing = true
+        updateButtonCount()
+
+        val service = AutomationAccessibilityService.instance ?: return
+
+        val appToKills = apps.map {
+            QueueManager.AppToKill(
+                packageName = it.packageName,
+                appLabel = it.label
+            )
+        }
+
+        val started = service.startKillQueue(
+            apps = appToKills,
+            onProgress = { current, total, appLabel ->
+                Log.d(TAG, "Progress: $current/$total — $appLabel")
+            },
+            onComplete = { result ->
+                runOnUiThread {
+                    isProcessing = false
+                    updateButtonCount()
+
+                    Toast.makeText(
+                        this,
+                        "Selesai: ${result.success} sukses, ${result.skipped} skip, ${result.failed} gagal",
+                        Toast.LENGTH_LONG
+                    ).show()
+
+                    markAsClosed(apps)
+
+                    handler.postDelayed({
+                        loadApps()
+                        updateRamInfo()
+                    }, 500)
+                }
+            }
+        )
+
+        if (!started) {
+            isProcessing = false
+            updateButtonCount()
+            Toast.makeText(this, "Gagal memulai queue", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun markAsClosed(apps: List<KillerAppItem>) {
+        lifecycleScope.launch {
+            try {
+                val dao = DatabaseProvider.runningAppDao()
+                apps.forEach { app ->
+                    dao.markClosed(app.packageName)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to mark closed", e)
+            }
+        }
     }
 }
