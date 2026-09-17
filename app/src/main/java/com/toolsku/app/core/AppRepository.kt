@@ -15,80 +15,7 @@ object AppRepository {
 
     /**
      * Ambil daftar SEMUA app terinstall (user + system).
-     */
-    suspend fun getInstalledApps(context: Context, includeSystem: Boolean = false): List<AppInfo> =
-        withContext(Dispatchers.IO) {
-            val pm = context.packageManager
-            val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-            val result = mutableListOf<AppInfo>()
-            val ourPackage = context.packageName
-
-            for (app in packages) {
-                if (app.packageName == ourPackage) continue
-
-                val isSystem = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                if (SystemApps.isDangerousSystemApp(app.packageName)) continue
-                if (!includeSystem && isSystem) continue
-                if (includeSystem && !isSystem) continue
-
-                result.add(
-                    AppInfo(
-                        packageName = app.packageName,
-                        label = pm.getApplicationLabel(app).toString(),
-                        icon = try { pm.getApplicationIcon(app) } catch (e: Exception) { null },
-                        isSystem = isSystem,
-                        isException = Prefs.isException(app.packageName)
-                    )
-                )
-            }
-
-            result.sortBy { it.label.lowercase() }
-            result
-        }
-
-    /**
-     * Ambil daftar app di exception list.
-     */
-    suspend fun getExceptionApps(context: Context): List<AppInfo> =
-        withContext(Dispatchers.IO) {
-            val pm = context.packageManager
-            val exceptionPackages = Prefs.exceptionList
-            val result = mutableListOf<AppInfo>()
-
-            Log.i(TAG, "getExceptionApps: ${exceptionPackages.size} packages in Prefs")
-
-            for (pkg in exceptionPackages) {
-                try {
-                    val appInfo = pm.getApplicationInfo(pkg, 0)
-                    val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-
-                    val label = try {
-                        pm.getApplicationLabel(appInfo).toString()
-                    } catch (e: Exception) {
-                        pkg
-                    }
-
-                    result.add(
-                        AppInfo(
-                            packageName = pkg,
-                            label = label,
-                            icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
-                            isSystem = isSystem,
-                            isException = true
-                        )
-                    )
-                } catch (e: PackageManager.NameNotFoundException) {
-                    Log.w(TAG, "SKIP (not installed): $pkg")
-                }
-            }
-
-            result.sortBy { it.label.lowercase() }
-            Log.i(TAG, "getExceptionApps result: ${result.size}")
-            result
-        }
-
-    /**
-     * Ambil semua app untuk dialog SELECT APPS.
+     * Untuk dialog SELECT APPS.
      */
     suspend fun getAllApps(context: Context, onlyUser: Boolean = false): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -119,51 +46,81 @@ object AppRepository {
         }
 
     /**
-     * Ambil system apps yang RUNNING dari DB.
-     * Logic SAMA dengan getRunningApps (user apps).
-     * TIDAK ada fallback.
+     * Ambil daftar SEMUA app terinstall (user + safe system).
+     * Untuk CLEANER — TIDAK filter exception.
      */
-    suspend fun getSafeSystemApps(context: Context): List<AppInfo> =
+    suspend fun getAllAppsForCleaner(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
+            val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
             val result = mutableListOf<AppInfo>()
+            val ourPackage = context.packageName
 
-            try {
-                val dao = DatabaseProvider.runningAppDao()
-                val entities = dao.getRunningSystemApps()
+            for (app in packages) {
+                if (app.packageName == ourPackage) continue
 
-                Log.i(TAG, "DB system apps: ${entities.size}")
+                // Skip HANYA dangerous system apps
+                if (SystemApps.isDangerousSystemApp(app.packageName)) continue
 
-                for (entity in entities) {
-                    if (Prefs.isException(entity.packageName)) continue
+                val isSystem = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
 
-                    try {
-                        val appInfo = pm.getApplicationInfo(entity.packageName, 0)
-                        result.add(
-                            AppInfo(
-                                packageName = entity.packageName,
-                                label = pm.getApplicationLabel(appInfo).toString(),
-                                icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
-                                isSystem = true,
-                                isException = false
-                            )
-                        )
-                    } catch (e: Exception) {
-                        // App sudah uninstall — hapus dari DB
-                        dao.delete(entity.packageName)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to get system apps", e)
+                result.add(
+                    AppInfo(
+                        packageName = app.packageName,
+                        label = pm.getApplicationLabel(app).toString(),
+                        icon = try { pm.getApplicationIcon(app) } catch (e: Exception) { null },
+                        isSystem = isSystem,
+                        isException = false  // Cleaner abaikan exception
+                    )
+                )
             }
 
             result.sortBy { it.label.lowercase() }
-            Log.i(TAG, "Final system apps: ${result.size}")
+            Log.i(TAG, "getAllAppsForCleaner: ${result.size} apps")
             result
         }
 
     /**
-     * Ambil USER apps yang RUNNING dari DB.
+     * Ambil daftar app di exception list.
+     */
+    suspend fun getExceptionApps(context: Context): List<AppInfo> =
+        withContext(Dispatchers.IO) {
+            val pm = context.packageManager
+            val exceptionPackages = Prefs.exceptionList
+            val result = mutableListOf<AppInfo>()
+
+            for (pkg in exceptionPackages) {
+                try {
+                    val appInfo = pm.getApplicationInfo(pkg, 0)
+                    val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+
+                    val label = try {
+                        pm.getApplicationLabel(appInfo).toString()
+                    } catch (e: Exception) {
+                        pkg
+                    }
+
+                    result.add(
+                        AppInfo(
+                            packageName = pkg,
+                            label = label,
+                            icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
+                            isSystem = isSystem,
+                            isException = true
+                        )
+                    )
+                } catch (e: PackageManager.NameNotFoundException) {
+                    // Skip yang tidak terinstall
+                }
+            }
+
+            result.sortBy { it.label.lowercase() }
+            result
+        }
+
+    /**
+     * Ambil running USER apps dari DB.
+     * Untuk KILLER — filter exception + isClosed.
      */
     suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
@@ -172,8 +129,6 @@ object AppRepository {
         try {
             val dao = DatabaseProvider.runningAppDao()
             val entities = dao.getRunningUserApps()
-
-            Log.i(TAG, "DB user apps: ${entities.size}")
 
             for (entity in entities) {
                 if (SystemApps.isDangerousSystemApp(entity.packageName)) continue
@@ -191,7 +146,6 @@ object AppRepository {
                         )
                     )
                 } catch (e: Exception) {
-                    // App sudah uninstall — hapus dari DB
                     dao.delete(entity.packageName)
                 }
             }
@@ -200,9 +154,47 @@ object AppRepository {
         }
 
         result.sortBy { it.label.lowercase() }
-        Log.i(TAG, "Final user running apps: ${result.size}")
         result
     }
+
+    /**
+     * Ambil running SAFE system apps dari DB.
+     * Untuk KILLER — filter exception + isClosed + safe only.
+     */
+    suspend fun getSafeSystemApps(context: Context): List<AppInfo> =
+        withContext(Dispatchers.IO) {
+            val pm = context.packageManager
+            val result = mutableListOf<AppInfo>()
+
+            try {
+                val dao = DatabaseProvider.runningAppDao()
+                val entities = dao.getRunningSystemApps()
+
+                for (entity in entities) {
+                    if (Prefs.isException(entity.packageName)) continue
+
+                    try {
+                        val appInfo = pm.getApplicationInfo(entity.packageName, 0)
+                        result.add(
+                            AppInfo(
+                                packageName = entity.packageName,
+                                label = pm.getApplicationLabel(appInfo).toString(),
+                                icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
+                                isSystem = true,
+                                isException = false
+                            )
+                        )
+                    } catch (e: Exception) {
+                        dao.delete(entity.packageName)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get safe system apps", e)
+            }
+
+            result.sortBy { it.label.lowercase() }
+            result
+        }
 
     /**
      * Kill app pakai killBackgroundProcesses().
