@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_overlay_gradient">
+    android:background="#0B1220">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -11,18 +11,16 @@
         android:orientation="vertical"
         android:padding="32dp">
 
-        <!-- TITLE -->
         <TextView
             android:id="@+id/tvTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/overlay_closing_apps"
-            android:textColor="@color/text_primary"
+            android:text="CLOSING APPS"
+            android:textColor="#FFFFFF"
             android:textSize="22sp"
             android:textStyle="bold"
             android:letterSpacing="0.15" />
 
-        <!-- CIRCULAR PROGRESS -->
         <FrameLayout
             android:layout_width="200dp"
             android:layout_height="200dp"
@@ -33,9 +31,10 @@
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:progressDrawable="@drawable/circular_progress_overlay"
                 android:max="100"
-                android:progress="0" />
+                android:progress="0"
+                android:progressTint="#29B6F6"
+                android:progressBackgroundTint="#1E2D4A" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -48,43 +47,40 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="0"
-                    android:textColor="@color/text_primary"
+                    android:textColor="#FFFFFF"
                     android:textSize="48sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/overlay_percent"
-                    android:textColor="@color/text_secondary"
+                    android:text="PERCENT"
+                    android:textColor="#8FA3BF"
                     android:textSize="11sp"
                     android:letterSpacing="0.15" />
             </LinearLayout>
         </FrameLayout>
 
-        <!-- SUBTITLE -->
         <TextView
             android:id="@+id/tvSubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="48dp"
-            android:text="@string/overlay_shutting_down"
-            android:textColor="@color/text_secondary"
+            android:text="SHUTTING DOWN"
+            android:textColor="#8FA3BF"
             android:textSize="12sp"
             android:letterSpacing="0.15" />
 
-        <!-- APP NAME -->
         <TextView
             android:id="@+id/tvAppName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text=""
-            android:textColor="@color/accent"
+            android:textColor="#29B6F6"
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <!-- PROGRESS BAR -->
         <ProgressBar
             android:id="@+id/progressBar"
             style="?android:attr/progressBarStyleHorizontal"
@@ -93,16 +89,14 @@
             android:layout_marginTop="24dp"
             android:max="100"
             android:progress="0"
-            android:progressTint="@color/accent"
-            android:progressBackgroundTint="@color/divider" />
+            android:progressTint="#29B6F6"
+            android:progressBackgroundTint="#1E2D4A" />
 
-        <!-- STOP BUTTON -->
         <FrameLayout
             android:id="@+id/btnStop"
             android:layout_width="64dp"
             android:layout_height="64dp"
             android:layout_marginTop="48dp"
-            android:background="@drawable/bg_stop_button"
             android:clickable="true"
             android:focusable="true">
 
@@ -110,7 +104,7 @@
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:layout_gravity="center"
-                android:background="@color/danger" />
+                android:background="#EF5350" />
         </FrameLayout>
 
     </LinearLayout>
