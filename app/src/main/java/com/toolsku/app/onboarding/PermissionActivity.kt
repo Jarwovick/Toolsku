@@ -1,29 +1,28 @@
 package com.toolsku.app.onboarding
 
-import android.content.Intent
 import android.os.Bundle
+import android.widget.Button
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.toolsku.app.R
 import com.toolsku.app.core.PermissionHelper
-import com.toolsku.app.databinding.ActivityPermissionBinding
 
 class PermissionActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityPermissionBinding
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityPermissionBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        setContentView(R.layout.activity_permission)
+        title = getString(R.string.onboarding_title)
 
-        binding.btnAccessibility.setOnClickListener {
+        findViewById<Button>(R.id.btnAccessibility).setOnClickListener {
             startActivity(PermissionHelper.accessibilityIntent())
         }
 
-        binding.btnOverlay.setOnClickListener {
+        findViewById<Button>(R.id.btnOverlay).setOnClickListener {
             startActivity(PermissionHelper.overlayIntent(this))
         }
 
-        binding.btnUsage.setOnClickListener {
+        findViewById<Button>(R.id.btnUsage).setOnClickListener {
             startActivity(PermissionHelper.usageAccessIntent())
         }
     }
@@ -34,22 +33,26 @@ class PermissionActivity : AppCompatActivity() {
     }
 
     private fun updateStatus() {
-        binding.tvAccessibilityStatus.text = if (PermissionHelper.isAccessibilityServiceEnabled(this)) {
-            getString(com.toolsku.app.R.string.perm_granted)
+        val tvAccessibility = findViewById<TextView>(R.id.tvAccessibilityStatus)
+        val tvOverlay = findViewById<TextView>(R.id.tvOverlayStatus)
+        val tvUsage = findViewById<TextView>(R.id.tvUsageStatus)
+
+        tvAccessibility.text = if (PermissionHelper.isAccessibilityServiceEnabled(this)) {
+            getString(R.string.perm_granted)
         } else {
-            getString(com.toolsku.app.R.string.perm_not_granted)
+            getString(R.string.perm_not_granted)
         }
 
-        binding.tvOverlayStatus.text = if (PermissionHelper.canDrawOverlays(this)) {
-            getString(com.toolsku.app.R.string.perm_granted)
+        tvOverlay.text = if (PermissionHelper.canDrawOverlays(this)) {
+            getString(R.string.perm_granted)
         } else {
-            getString(com.toolsku.app.R.string.perm_not_granted)
+            getString(R.string.perm_not_granted)
         }
 
-        binding.tvUsageStatus.text = if (PermissionHelper.hasUsageAccess(this)) {
-            getString(com.toolsku.app.R.string.perm_granted)
+        tvUsage.text = if (PermissionHelper.hasUsageAccess(this)) {
+            getString(R.string.perm_granted)
         } else {
-            getString(com.toolsku.app.R.string.perm_not_granted)
+            getString(R.string.perm_not_granted)
         }
     }
 }
