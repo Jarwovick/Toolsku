@@ -1,6 +1,10 @@
 package com.toolsku.app.cleaner
 
+import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.ImageButton
@@ -23,6 +27,11 @@ import kotlinx.coroutines.launch
 
 class CleanerActivity : AppCompatActivity() {
 
+    companion object {
+        private const val TAG = "CleanerActivity"
+        private const val MIN_CACHE_SIZE = 10 * 1024 * 1024L  // 10 MB
+    }
+
     private lateinit var adapter: CleanerAdapter
     private lateinit var tvHeaderTitle: TextView
     private lateinit var tvTotalCache: TextView
@@ -33,11 +42,7 @@ class CleanerActivity : AppCompatActivity() {
     private lateinit var tvLoading: TextView
 
     private var isProcessing = false
-
-    companion object {
-        /** Minimal cache size untuk ditampilkan: 10 MB */
-        private const val MIN_CACHE_SIZE = 10 * 1024 * 1024L
-    }
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,6 +87,21 @@ class CleanerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (!isProcessing) {
+            loadApps()
+        }
+    }
+
+    /**
+     * Handle Intent baru — saat forceBackToCleaner dipanggil.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+
+        if (intent.getBooleanExtra("refresh_after_clean", false)) {
+            Log.i(TAG, "onNewIntent: refresh after clean")
+            isProcessing = false
+            updateButtonCount()
             loadApps()
         }
     }
@@ -202,7 +222,6 @@ class CleanerActivity : AppCompatActivity() {
 
         val service = AutomationAccessibilityService.instance ?: return
 
-        // Setup stop callback
         AutomationAccessibilityService.onStopClick = {
             service.cancelQueue()
             service.hideOverlay()
@@ -211,7 +230,6 @@ class CleanerActivity : AppCompatActivity() {
             Toast.makeText(this, "Dibatalkan", Toast.LENGTH_SHORT).show()
         }
 
-        // Show overlay (via Accessibility Service)
         service.showOverlay(0, apps.size, "", AutomationAccessibilityService.MODE_CLEANER)
 
         val tasks = apps.map { app ->
@@ -229,7 +247,6 @@ class CleanerActivity : AppCompatActivity() {
             steps.add(ActionStep.Wait(200))
             steps.add(ActionStep.Back)
             steps.add(ActionStep.Wait(200))
-            // Pass appLabel untuk overlay
             AutomationTask(app.packageName, app.label, steps)
         }
 
@@ -244,14 +261,41 @@ class CleanerActivity : AppCompatActivity() {
                     AutomationAccessibilityService.onStopClick = null
                     isProcessing = false
                     updateButtonCount()
-                    loadApps()
+
                     Toast.makeText(
                         this,
                         "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
-                        Toast.LENGTH_LONG
+                        Toast.LENGTH_SHORT
                     ).show()
+
+                    // ⭐ FORCE back ke Cleaner
+                    forceBackToCleaner()
+
+                    // Refresh setelah 1 detik
+                    handler.postDelayed({
+                        loadApps()
+                    }, 1000)
                 }
             }
         )
+    }
+
+    /**
+     * Force kembali ke CleanerActivity.
+     */
+    private fun forceBackToCleaner() {
+        try {
+            val intent = Intent(this, CleanerActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra("refresh_after_clean", true)
+            }
+            startActivity(intent)
+            Log.i(TAG, "Force back to Cleaner via Intent")
+        } catch (e: Exception) {
+            Log.e(TAG, "forceBackToCleaner failed", e)
+            finish()
+        }
     }
 }
