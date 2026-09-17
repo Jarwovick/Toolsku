@@ -11,6 +11,9 @@ interface RunningAppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: RunningAppEntity)
 
+    /**
+     * Ambil running USER apps.
+     */
     @Query("""
         SELECT * FROM running_apps 
         WHERE isClosed = 0 
@@ -21,6 +24,9 @@ interface RunningAppDao {
     """)
     suspend fun getRunningUserApps(): List<RunningAppEntity>
 
+    /**
+     * Ambil running SYSTEM apps.
+     */
     @Query("""
         SELECT * FROM running_apps 
         WHERE isClosed = 0 
