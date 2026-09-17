@@ -13,9 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-/**
- * Tracker untuk app yang dibuka/ditutup.
- */
 object AppTracker {
 
     private const val TAG = "AppTracker"
@@ -35,7 +32,6 @@ object AppTracker {
                 val existing = dao.getApp(packageName)
 
                 if (existing == null) {
-                    // App baru
                     dao.upsert(
                         RunningAppEntity(
                             packageName = packageName,
@@ -46,14 +42,14 @@ object AppTracker {
                     )
                     Log.d(TAG, "New ${if (isSystem) "system" else "user"} app: $packageName")
                 } else {
-                    // Update
+                    // Reset isClosed ketika app dibuka lagi
                     dao.upsert(
                         existing.copy(
                             lastUsed = System.currentTimeMillis(),
                             isClosed = false
                         )
                     )
-                    Log.d(TAG, "Updated app: $packageName")
+                    Log.d(TAG, "Updated app: $packageName (isClosed reset)")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to track: $packageName", e)
@@ -113,9 +109,6 @@ object AppTracker {
         }
     }
 
-    /**
-     * Cek apakah package adalah system app.
-     */
     private fun isSystemApp(context: Context, packageName: String): Boolean {
         return try {
             val appInfo = context.packageManager.getApplicationInfo(packageName, 0)
@@ -127,6 +120,7 @@ object AppTracker {
 
     /**
      * Cek apakah app harus di-skip.
+     * System apps BOLEH di-track kalau punya launcher (bisa dibuka user).
      */
     private fun shouldSkip(context: Context, packageName: String): Boolean {
         // Skip app sendiri
@@ -144,10 +138,10 @@ object AppTracker {
         // Skip app yang di-exception
         if (Prefs.isException(packageName)) return true
 
-        // ⭐ Skip HANYA yang dangerous — safe system apps BOLEH di-track
+        // Skip DANGEROUS system apps
         if (SystemApps.isDangerousSystemApp(packageName)) return true
 
-        // Cek apakah app punya launch intent
+        // Cek launch intent — kalau TIDAK punya, skip
         return try {
             val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
             launchIntent == null
@@ -162,6 +156,9 @@ object AppTracker {
         "com.android.providers.settings",
         "com.android.shell",
         "com.android.providers.media",
-        "com.android.providers.contacts"
+        "com.android.providers.contacts",
+        "com.android.providers.telephony",
+        "com.android.providers.calendar",
+        "com.android.providers.downloads"
     )
 }
