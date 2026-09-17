@@ -28,10 +28,10 @@ abstract class BaseStep : ActionStep {
 
     protected val handler: Handler = Handler(Looper.getMainLooper())
 
-    protected var currentWindowId: Int = -1
+    // ⚠️ Rename dengan suffix "Value" untuk hindari clash dengan interface methods
+    protected var currentWindowIdValue: Int = -1
     protected var currentPackage: String = ""
-
-    protected var parentTask: TaskStateMachine? = null
+    protected var parentTaskValue: TaskStateMachine? = null
 
     init {
         eventTypes.add(TYPE_WINDOW_STATE_CHANGED)
@@ -66,7 +66,7 @@ abstract class BaseStep : ActionStep {
         if (node != null) {
             try {
                 val windowId = node.windowId
-                if (windowId > 0 && currentWindowId == windowId) {
+                if (windowId > 0 && currentWindowIdValue == windowId) {
                     return StepResult.keepStage()
                 }
             } catch (e: Exception) {
@@ -126,14 +126,14 @@ abstract class BaseStep : ActionStep {
     }
 
     override fun setParentTask(task: TaskStateMachine) {
-        this.parentTask = task
+        parentTaskValue = task
     }
 
     override fun setCurrentWindowId(windowId: Int) {
-        this.currentWindowId = windowId
+        currentWindowIdValue = windowId
     }
 
-    override fun getCurrentWindowId(): Int = currentWindowId
+    override fun getCurrentWindowId(): Int = currentWindowIdValue
 
     override fun onResult(result: StepResult) {
         // Default: no-op
