@@ -112,27 +112,33 @@ class CleanerActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                Log.i(TAG, "Loading apps...")
+                Log.i(TAG, "===== Loading apps =====")
 
-                // ⭐ Pakai getAllAppsForCleaner — TIDAK ada exception filter
+                // 1. Ambil SEMUA app dari PackageManager (via AppRepository)
                 val allApps: List<AppInfo> = AppRepository.getAllAppsForCleaner(this@CleanerActivity)
                 Log.i(TAG, "Total apps: ${allApps.size}")
 
-                // Hitung cache size
+                if (allApps.isEmpty()) {
+                    tvLoading.text = "Tidak ada app terinstall"
+                    return@launch
+                }
+
+                // 2. Hitung cache size
                 val cacheSizes: Map<String, Long> = CacheSizeFetcher.getCacheSizes(
                     this@CleanerActivity,
                     allApps.map { it.packageName }
                 )
                 Log.i(TAG, "Cache sizes: ${cacheSizes.size}")
 
-                // Filter cache >= 10 MB
+                // 3. Filter cache >= 10 MB
                 val items: List<CleanerAppItem> = allApps
                     .map { app ->
+                        val cacheSize = cacheSizes[app.packageName] ?: 0L
                         CleanerAppItem(
                             packageName = app.packageName,
                             label = app.label,
                             icon = app.icon,
-                            cacheSize = cacheSizes[app.packageName] ?: 0L,
+                            cacheSize = cacheSize,
                             isSystem = app.isSystem,
                             selected = true
                         )
@@ -142,6 +148,7 @@ class CleanerActivity : AppCompatActivity() {
 
                 Log.i(TAG, "Apps with cache >= 10MB: ${items.size}")
 
+                // Tampilkan
                 adapter.submitList(items)
                 updateTotals(items)
                 updateSelectAllIcon()
@@ -158,7 +165,6 @@ class CleanerActivity : AppCompatActivity() {
                 Log.e(TAG, "loadApps failed", e)
                 tvLoading.visibility = View.VISIBLE
                 tvLoading.text = "Error: ${e.message}"
-                // ⭐ JANGAN finish() — biar user lihat error
             }
         }
     }
