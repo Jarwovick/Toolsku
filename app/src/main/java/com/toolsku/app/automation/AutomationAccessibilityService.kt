@@ -5,6 +5,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.toolsku.app.killer.engine.QueueManager
+import com.toolsku.app.killer.engine.QueueResult
 import com.toolsku.app.killer.overlay.KillerOverlayManager
 
 class AutomationAccessibilityService : AccessibilityService() {
@@ -17,7 +18,7 @@ class AutomationAccessibilityService : AccessibilityService() {
             private set
 
         /**
-         * Callback stop — dipakai Cleaner & Shortcut.
+         * Callback stop — kompatibilitas dengan Cleaner & Shortcut lama.
          */
         @Volatile
         var onStopClick: (() -> Unit)? = null
@@ -78,7 +79,7 @@ class AutomationAccessibilityService : AccessibilityService() {
     }
 
     // ============================================
-    // UNTUK KILLER
+    // KILLER — Queue Manager
     // ============================================
 
     /**
@@ -87,7 +88,7 @@ class AutomationAccessibilityService : AccessibilityService() {
     fun startKillQueue(
         apps: List<QueueManager.AppToKill>,
         onProgress: (current: Int, total: Int, appLabel: String) -> Unit,
-        onComplete: (com.toolsku.app.killer.engine.QueueResult) -> Unit
+        onComplete: (QueueResult) -> Unit
     ): Boolean {
         if (queueManager?.isActive() == true) {
             Log.w(TAG, "Queue already active")
@@ -122,7 +123,6 @@ class AutomationAccessibilityService : AccessibilityService() {
 
     /**
      * Cancel queue.
-     * ⭐ Dipakai juga oleh Cleaner & Shortcut.
      */
     fun cancelQueue() {
         Log.i(TAG, "Cancel queue")
@@ -134,7 +134,6 @@ class AutomationAccessibilityService : AccessibilityService() {
 
     /**
      * Sembunyikan overlay.
-     * ⭐ Dipakai juga oleh Cleaner & Shortcut.
      */
     fun hideOverlay() {
         Log.i(TAG, "Hide overlay")
@@ -144,7 +143,6 @@ class AutomationAccessibilityService : AccessibilityService() {
 
     /**
      * Tampilkan overlay.
-     * ⭐ Dipakai juga oleh Cleaner & Shortcut.
      */
     fun showOverlay(current: Int, total: Int, appLabel: String, mode: String) {
         Log.i(TAG, "Show overlay: mode=$mode")
@@ -154,7 +152,6 @@ class AutomationAccessibilityService : AccessibilityService() {
 
     /**
      * Update overlay.
-     * ⭐ Dipakai juga oleh Cleaner & Shortcut.
      */
     fun updateOverlay(current: Int, total: Int, appLabel: String) {
         overlayManager?.update(current, total, appLabel)
@@ -164,24 +161,4 @@ class AutomationAccessibilityService : AccessibilityService() {
      * Cek apakah ada queue aktif.
      */
     fun isKillQueueActive(): Boolean = queueManager?.isActive() == true
-
-    /**
-     * Start queue (untuk Cleaner & Shortcut).
-     * ⭐ Compatibility method.
-     */
-    fun startQueue(
-        tasks: List<com.toolsku.app.automation.AutomationTask>,
-        onProgress: ((current: Int, total: Int, appLabel: String) -> Unit)? = null,
-        onComplete: ((com.toolsku.app.automation.QueueStats) -> Unit)? = null
-    ): Boolean {
-        // Konversi ke AppToKill untuk Killer
-        // Untuk Cleaner & Shortcut, mereka akan panggil method ini
-        // dan kita pakai automation lama
-        return com.toolsku.app.automation.QueueHelper.runQueue(
-            service = this,
-            tasks = tasks,
-            onProgress = onProgress,
-            onComplete = onComplete
-        )
-    }
 }
