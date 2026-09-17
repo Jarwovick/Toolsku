@@ -20,11 +20,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Activity transparan yang dijalankan dari shortcut "Toolsku Quick".
- *
- * Alur:
- * 1. Kill all running apps (dengan fallback)
- * 2. Clear cache all apps (≥ 10 MB)
- * 3. Kembali ke home
+ * Kill + Clean sekaligus.
  */
 class QuickActionActivity : AppCompatActivity() {
 
@@ -36,7 +32,6 @@ class QuickActionActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Cek izin
         val service = AutomationAccessibilityService.instance
         if (service == null) {
             Toast.makeText(this, "Aktifkan Aksesibilitas dulu", Toast.LENGTH_LONG).show()
@@ -50,21 +45,19 @@ class QuickActionActivity : AppCompatActivity() {
             return
         }
 
-        // Jalankan
         runQuickAction()
     }
 
     private fun runQuickAction() {
         lifecycleScope.launch {
             try {
-                // ===== FASE 1: Ambil apps untuk KILL =====
+                // ===== FASE 1: KILL =====
                 Log.i(TAG, "Phase 1: Getting apps to kill")
                 var killApps: List<AppInfo> = AppRepository.getRunningApps(this@QuickActionActivity)
                 Log.i(TAG, "Running apps (DB): ${killApps.size}")
 
-                // Fallback: kalau DB kosong, pakai user apps
                 if (killApps.isEmpty()) {
-                    Log.w(TAG, "No running apps, using fallback (user apps)")
+                    Log.w(TAG, "No running apps, using fallback")
                     killApps = AppRepository.getInstalledApps(
                         this@QuickActionActivity,
                         includeSystem = false
@@ -72,7 +65,7 @@ class QuickActionActivity : AppCompatActivity() {
                     Log.i(TAG, "Fallback kill apps: ${killApps.size}")
                 }
 
-                // ===== FASE 2: Ambil apps untuk CLEAR CACHE =====
+                // ===== FASE 2: CLEAN =====
                 Log.i(TAG, "Phase 2: Getting apps to clean")
                 val userApps: List<AppInfo> = AppRepository.getInstalledApps(
                     this@QuickActionActivity,
@@ -83,24 +76,19 @@ class QuickActionActivity : AppCompatActivity() {
                 )
                 val candidateApps: List<AppInfo> = (userApps + systemApps)
                     .distinctBy { app: AppInfo -> app.packageName }
+                Log.i(TAG, "Candidates: ${candidateApps.size}")
 
-                Log.i(TAG, "Candidate apps: ${candidateApps.size}")
-
-                // Query cache size
                 val cacheSizes: Map<String, Long> = CacheSizeFetcher.getCacheSizes(
                     this@QuickActionActivity,
                     candidateApps.map { app: AppInfo -> app.packageName }
                 )
-                Log.i(TAG, "Cache sizes retrieved: ${cacheSizes.size}")
 
-                // Filter cache >= 10 MB
                 val cleanApps: List<AppInfo> = candidateApps.filter { app: AppInfo ->
                     val cacheSize: Long = cacheSizes[app.packageName] ?: 0L
                     cacheSize >= MIN_CACHE_SIZE
                 }
                 Log.i(TAG, "Apps to clean (≥ 10 MB): ${cleanApps.size}")
 
-                // ===== TOTAL =====
                 val totalTasks: Int = killApps.size + cleanApps.size
                 Log.i(TAG, "Total: kill=${killApps.size}, clean=${cleanApps.size}, all=$totalTasks")
 
@@ -127,7 +115,6 @@ class QuickActionActivity : AppCompatActivity() {
                     goHome()
                 }
 
-                // Mode overlay
                 val mode: String = if (cleanApps.isNotEmpty()) {
                     AutomationAccessibilityService.MODE_CLEANER
                 } else {
@@ -150,14 +137,7 @@ class QuickActionActivity : AppCompatActivity() {
                     steps.add(ActionStep.Wait(200))
                     steps.add(ActionStep.Back)
                     steps.add(ActionStep.Wait(150))
-
-                    allTasks.add(
-                        AutomationTask(
-                            app.packageName,
-                            app.label,
-                            steps
-                        )
-                    )
+                    allTasks.add(AutomationTask(app.packageName, app.label, steps))
                 }
 
                 // Task CLEAN
@@ -167,25 +147,16 @@ class QuickActionActivity : AppCompatActivity() {
                     steps.add(ActionStep.Wait(400))
                     steps.add(ActionStep.ClickByText(OemProfile.storageMenuLabels))
                     steps.add(ActionStep.Wait(400))
-                    steps.add(
-                        ActionStep.ClickByTextSafe(
-                            OemProfile.clearCacheLabels,
-                            OemProfile.clearDataLabels
-                        )
-                    )
+                    steps.add(ActionStep.ClickByTextSafe(
+                        OemProfile.clearCacheLabels,
+                        OemProfile.clearDataLabels
+                    ))
                     steps.add(ActionStep.Wait(400))
                     steps.add(ActionStep.Back)
                     steps.add(ActionStep.Wait(200))
                     steps.add(ActionStep.Back)
                     steps.add(ActionStep.Wait(200))
-
-                    allTasks.add(
-                        AutomationTask(
-                            app.packageName,
-                            app.label,
-                            steps
-                        )
-                    )
+                    allTasks.add(AutomationTask(app.packageName, app.label, steps))
                 }
 
                 // ===== RUN =====
@@ -198,16 +169,12 @@ class QuickActionActivity : AppCompatActivity() {
                         runOnUiThread {
                             service.hideOverlay()
                             AutomationAccessibilityService.onStopClick = null
-
-                            // Kill Settings task
                             killSettingsTask()
-
                             Toast.makeText(
                                 this@QuickActionActivity,
                                 "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
                                 Toast.LENGTH_LONG
                             ).show()
-
                             goHome()
                         }
                     }
@@ -225,9 +192,6 @@ class QuickActionActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Kembali ke home screen device.
-     */
     private fun goHome() {
         try {
             val homeIntent = Intent(Intent.ACTION_MAIN).apply {
@@ -242,9 +206,6 @@ class QuickActionActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Kill task Settings (App Info).
-     */
     private fun killSettingsTask() {
         try {
             val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -272,6 +233,5 @@ class QuickActionActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        // Jangan finish saat di-pause (overlay masih jalan)
     }
 }
