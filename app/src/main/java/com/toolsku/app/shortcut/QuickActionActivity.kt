@@ -7,7 +7,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
 /**
- * SEMENTARA: Shortcut dinonaktifkan sambil Killer refactor.
+ * SEMENTARA: Shortcut dinonaktifkan selama Killer refactor.
  */
 class QuickActionActivity : AppCompatActivity() {
 
