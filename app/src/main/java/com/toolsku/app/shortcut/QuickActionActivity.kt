@@ -1,5 +1,8 @@
 package com.toolsku.app.shortcut
 
+import android.app.ActivityManager
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -9,6 +12,7 @@ import com.toolsku.app.automation.ActionStep
 import com.toolsku.app.automation.AutomationAccessibilityService
 import com.toolsku.app.automation.AutomationTask
 import com.toolsku.app.automation.OemProfile
+import com.toolsku.app.core.AppInfo
 import com.toolsku.app.core.AppRepository
 import com.toolsku.app.core.CacheSizeFetcher
 import com.toolsku.app.core.PermissionHelper
@@ -18,14 +22,14 @@ import kotlinx.coroutines.launch
  * Activity transparan yang dijalankan dari shortcut "Toolsku Quick".
  *
  * Alur:
- * 1. Kill all running apps
+ * 1. Kill all running apps (dengan fallback)
  * 2. Clear cache all apps (≥ 10 MB)
- * 3. Selesai → tutup
+ * 3. Kembali ke home
  */
 class QuickActionActivity : AppCompatActivity() {
 
     companion object {
-        private const val TAG = "QuickAction"
+        private const val TAG = "ToolskuQuick"
         private const val MIN_CACHE_SIZE = 10 * 1024 * 1024L  // 10 MB
     }
 
@@ -36,46 +40,61 @@ class QuickActionActivity : AppCompatActivity() {
         val service = AutomationAccessibilityService.instance
         if (service == null) {
             Toast.makeText(this, "Aktifkan Aksesibilitas dulu", Toast.LENGTH_LONG).show()
-            finish()
+            goHome()
             return
         }
 
         if (!PermissionHelper.canDrawOverlays(this)) {
             Toast.makeText(this, "Aktifkan izin overlay dulu", Toast.LENGTH_LONG).show()
-            finish()
+            goHome()
             return
         }
 
-        // Jalankan alur
+        // Jalankan
         runQuickAction()
     }
 
     private fun runQuickAction() {
         lifecycleScope.launch {
             try {
-                // FASE 1: Ambil daftar app untuk kill
+                // ===== FASE 1: Ambil apps untuk KILL =====
                 Log.i(TAG, "Phase 1: Getting apps to kill")
-                val runningApps = AppRepository.getRunningApps(this@QuickActionActivity)
-                val systemApps = AppRepository.getSafeSystemApps(this@QuickActionActivity)
-                val killApps = runningApps + systemApps
+                var killApps = AppRepository.getRunningApps(this@QuickActionActivity)
+                Log.i(TAG, "Running apps (DB): ${killApps.size}")
 
-                // FASE 2: Ambil daftar app untuk clear cache
+                // ⭐ FALLBACK: kalau DB kosong, pakai user apps
+                if (killApps.isEmpty()) {
+                    Log.w(TAG, "No running apps, using fallback (user apps)")
+                    killApps = AppRepository.getInstalledApps(
+                        this@QuickActionActivity,
+                        includeSystem = false
+                    ).take(15)
+                    Log.i(TAG, "Fallback kill apps: ${killApps.size}")
+                }
+
+                // ===== FASE 2: Ambil apps untuk CLEAR CACHE =====
                 Log.i(TAG, "Phase 2: Getting apps to clean")
-                val allApps = AppRepository.getInstalledApps(this@QuickActionActivity, includeSystem = false)
-                val safeSystemApps = AppRepository.getSafeSystemApps(this@QuickActionActivity)
-                val allAppsForClean = (allApps + safeSystemApps).distinctBy { it.packageName }
+                val userApps = AppRepository.getInstalledApps(
+                    this@QuickActionActivity,
+                    includeSystem = false
+                )
+                val systemApps = AppRepository.getSafeSystemApps(this@QuickActionActivity)
+                val candidateApps = (userApps + systemApps).distinctBy { it.packageName }
 
                 val cacheSizes = CacheSizeFetcher.getCacheSizes(
                     this@QuickActionActivity,
-                    allAppsForClean.map { it.packageName }
+                    candidateApps.map { it.packageName }
                 )
 
-                val cleanApps = allAppsForClean
-                    .filter { (cacheSizes[it.packageName] ?: 0L) >= MIN_CACHE_SIZE }
+                val cleanApps = candidateApps.filter { app ->
+                    val cacheSize = cacheSizes[app.packageName] ?: 0L
+                    cacheSize >= MIN_CACHE_SIZE
+                }
+                Log.i(TAG, "Apps to clean (≥ 10 MB): ${cleanApps.size}")
 
-                // Total task
+                // ===== TOTAL =====
                 val totalTasks = killApps.size + cleanApps.size
-                Log.i(TAG, "Total tasks: $totalTasks (kill=${killApps.size}, clean=${cleanApps.size})")
+                Log.i(TAG, "Total: kill=${killApps.size}, clean=${cleanApps.size}, all=$totalTasks")
 
                 if (totalTasks == 0) {
                     Toast.makeText(
@@ -83,32 +102,35 @@ class QuickActionActivity : AppCompatActivity() {
                         "Tidak ada yang perlu dibersihkan",
                         Toast.LENGTH_SHORT
                     ).show()
-                    finish()
+                    goHome()
                     return@launch
                 }
 
-                // Setup stop callback
+                // ===== SETUP =====
                 val service = AutomationAccessibilityService.instance ?: run {
-                    finish()
+                    goHome()
                     return@launch
                 }
 
                 AutomationAccessibilityService.onStopClick = {
                     service.cancelQueue()
                     service.hideOverlay()
-                    finish()
+                    goHome()
                 }
 
-                // Tampilkan overlay
-                service.showOverlay(
-                    0, totalTasks, "",
+                // Mode overlay — KILLER kalau tidak ada clean
+                val mode = if (cleanApps.isNotEmpty()) {
                     AutomationAccessibilityService.MODE_CLEANER
-                )
+                } else {
+                    AutomationAccessibilityService.MODE_KILLER
+                }
 
-                // Build tasks
+                service.showOverlay(0, totalTasks, "", mode)
+
+                // ===== BUILD TASKS =====
                 val allTasks = mutableListOf<AutomationTask>()
 
-                // Task untuk kill
+                // ⭐ Task KILL — pakai 3 parameter (pkg, label, steps)
                 killApps.forEach { app ->
                     val steps = mutableListOf<ActionStep>()
                     steps.add(ActionStep.OpenAppInfo(app.packageName))
@@ -119,10 +141,10 @@ class QuickActionActivity : AppCompatActivity() {
                     steps.add(ActionStep.Wait(200))
                     steps.add(ActionStep.Back)
                     steps.add(ActionStep.Wait(150))
-                    allTasks.add(AutomationTask(app.packageName, steps))
+                    allTasks.add(AutomationTask(app.packageName, app.label, steps))
                 }
 
-                // Task untuk clean cache
+                // ⭐ Task CLEAN — pakai 3 parameter
                 cleanApps.forEach { app ->
                     val steps = mutableListOf<ActionStep>()
                     steps.add(ActionStep.OpenAppInfo(app.packageName))
@@ -138,25 +160,31 @@ class QuickActionActivity : AppCompatActivity() {
                     steps.add(ActionStep.Wait(200))
                     steps.add(ActionStep.Back)
                     steps.add(ActionStep.Wait(200))
-                    allTasks.add(AutomationTask(app.packageName, steps))
+                    allTasks.add(AutomationTask(app.packageName, app.label, steps))
                 }
 
-                // Jalankan
+                // ===== RUN =====
                 service.runQueue(
                     tasks = allTasks,
-                    onProgress = { current, total, pkg ->
-                        service.updateOverlay(current, total, pkg)
+                    onProgress = { current, total, appLabel ->
+                        // ⭐ Pakai appLabel (bukan pkg)
+                        service.updateOverlay(current, total, appLabel)
                     },
                     onComplete = { stats ->
                         runOnUiThread {
                             service.hideOverlay()
                             AutomationAccessibilityService.onStopClick = null
+
+                            // ⭐ Kill Settings task
+                            killSettingsTask()
+
                             Toast.makeText(
                                 this@QuickActionActivity,
                                 "Selesai: ${stats.success} sukses, ${stats.failed} gagal",
                                 Toast.LENGTH_LONG
                             ).show()
-                            finish()
+
+                            goHome()
                         }
                     }
                 )
@@ -168,8 +196,53 @@ class QuickActionActivity : AppCompatActivity() {
                     "Error: ${e.message}",
                     Toast.LENGTH_LONG
                 ).show()
-                finish()
+                goHome()
             }
+        }
+    }
+
+    /**
+     * Kembali ke home screen device.
+     */
+    private fun goHome() {
+        try {
+            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(homeIntent)
+            finish()
+        } catch (e: Exception) {
+            Log.e(TAG, "goHome failed", e)
+            finish()
+        }
+    }
+
+    /**
+     * Kill task Settings (App Info) supaya Back keluar dari Toolsku.
+     */
+    private fun killSettingsTask() {
+        try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val tasks = am.appTasks
+            for (task in tasks) {
+                try {
+                    val taskInfo = task.taskInfo
+                    val baseIntent = taskInfo?.baseIntent
+                    val pkg = baseIntent?.component?.packageName
+
+                    if (pkg == "com.android.settings" ||
+                        pkg == "com.coloros.settings" ||
+                        pkg == "com.oppo.settings") {
+                        task.finishAndRemoveTask()
+                        Log.i(TAG, "Killed Settings task: $pkg")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to kill task", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "killSettingsTask failed", e)
         }
     }
 
