@@ -21,8 +21,10 @@ abstract class BaseStep : ActionStep {
 
     /**
      * Event types yang di-handle.
+     * ⚠️ Rename dari `supportedEvents` ke `eventTypes` untuk hindari
+     * konflik dengan `ActionStep.getSupportedEvents()`.
      */
-    protected val supportedEvents: MutableList<Int> = CopyOnWriteArrayList()
+    protected val eventTypes: MutableList<Int> = CopyOnWriteArrayList()
 
     @Volatile
     protected var running: Boolean = false
@@ -37,9 +39,8 @@ abstract class BaseStep : ActionStep {
     protected var currentPackage: String = ""
 
     init {
-        // Default event types
-        supportedEvents.add(TYPE_WINDOW_STATE_CHANGED)
-        supportedEvents.add(TYPE_WINDOW_CONTENT_CHANGED)
+        eventTypes.add(TYPE_WINDOW_STATE_CHANGED)
+        eventTypes.add(TYPE_WINDOW_CONTENT_CHANGED)
     }
 
     companion object {
@@ -73,7 +74,7 @@ abstract class BaseStep : ActionStep {
         if (!running) return StepResult.keepStage()
 
         // Cek event type didukung
-        if (!supportedEvents.contains(eventType)) {
+        if (!eventTypes.contains(eventType)) {
             return StepResult.keepStage()
         }
 
@@ -108,12 +109,10 @@ abstract class BaseStep : ActionStep {
             action.currentNode = null
 
             if (result.isKeepStage()) {
-                // Ulangi step ini — tunggu event berikut
                 return StepResult.keepStage()
             }
 
             if (result.isSkipTask()) {
-                // Skip task
                 return StepResult.skipTask()
             }
 
@@ -122,15 +121,12 @@ abstract class BaseStep : ActionStep {
             }
 
             if (result.isComplete) {
-                // Action selesai, lanjut action berikutnya
                 continue
             }
 
-            // Action belum selesai — tunggu event
             return StepResult.waitEvent()
         }
 
-        // Semua action selesai
         return StepResult.success()
     }
 
@@ -143,19 +139,16 @@ abstract class BaseStep : ActionStep {
 
     override fun isRunning(): Boolean = running
 
-    override fun getSupportedEvents(): List<Int> = supportedEvents
+    /**
+     * Return event types — dipanggil oleh ActionStep interface.
+     */
+    override fun getSupportedEvents(): List<Int> = eventTypes
 
     override fun pause() {
         paused = true
     }
 
-    /**
-     * Cek apakah step bisa dilewati.
-     */
     open fun canSkip(): Boolean = false
 
-    /**
-     * Get package name step ini.
-     */
     fun getPackage(): String = currentPackage
 }
