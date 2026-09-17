@@ -3,17 +3,6 @@ package com.toolsku.app.killer.core
 /**
  * Hasil eksekusi satu step / action.
  * Tiru dari `ho2` Baxa.
- *
- * State codes:
- * - 0  = default (belum selesai)
- * - 2  = need repeat
- * - 3  = skipTask
- * - 5  = keepStage
- * - 6  = force completed
- * - 7  = repeatStage
- * - 8  = restartStage
- * - 10 = wait (tunggu event)
- * - 11 = repeatTask
  */
 class StepResult(
     val code: Int = CODE_DEFAULT,
@@ -32,9 +21,6 @@ class StepResult(
         const val CODE_WAIT = 10
         const val CODE_REPEAT_TASK = 11
 
-        /**
-         * Sukses — step selesai, lanjut step berikutnya.
-         */
         fun success(): StepResult {
             return StepResult(CODE_DEFAULT).apply {
                 isComplete = true
@@ -42,16 +28,10 @@ class StepResult(
             }
         }
 
-        /**
-         * Ulangi step ini — tunggu event lagi.
-         */
         fun keepStage(): StepResult {
             return StepResult(CODE_KEEP_STAGE)
         }
 
-        /**
-         * Skip task — app tidak perlu diproses.
-         */
         fun skipTask(): StepResult {
             return StepResult(CODE_SKIP_TASK).apply {
                 isComplete = true
@@ -59,23 +39,10 @@ class StepResult(
             }
         }
 
-        /**
-         * Ulangi step ini.
-         */
-        fun repeatStage(): StepResult {
-            return StepResult(CODE_REPEAT_STAGE)
-        }
+        fun repeatStage(): StepResult = StepResult(CODE_REPEAT_STAGE)
 
-        /**
-         * Restart dari step pertama.
-         */
-        fun restartStage(): StepResult {
-            return StepResult(CODE_RESTART_STAGE)
-        }
+        fun restartStage(): StepResult = StepResult(CODE_RESTART_STAGE)
 
-        /**
-         * Ulangi task.
-         */
         fun repeatTask(): StepResult {
             return StepResult(CODE_REPEAT_TASK).apply {
                 isComplete = true
@@ -83,16 +50,8 @@ class StepResult(
             }
         }
 
-        /**
-         * Tunggu event.
-         */
-        fun waitEvent(): StepResult {
-            return StepResult(CODE_WAIT)
-        }
+        fun waitEvent(): StepResult = StepResult(CODE_WAIT)
 
-        /**
-         * Error — task gagal.
-         */
         fun error(): StepResult {
             return StepResult(CODE_DEFAULT).apply {
                 isComplete = true
@@ -100,9 +59,6 @@ class StepResult(
             }
         }
 
-        /**
-         * Force complete — abaikan step berikutnya.
-         */
         fun forceComplete(): StepResult {
             return StepResult(CODE_FORCE_COMPLETE).apply {
                 isComplete = true
