@@ -59,10 +59,10 @@ class QuickActionActivity : AppCompatActivity() {
             try {
                 // ===== FASE 1: Ambil apps untuk KILL =====
                 Log.i(TAG, "Phase 1: Getting apps to kill")
-                var killApps = AppRepository.getRunningApps(this@QuickActionActivity)
+                var killApps: List<AppInfo> = AppRepository.getRunningApps(this@QuickActionActivity)
                 Log.i(TAG, "Running apps (DB): ${killApps.size}")
 
-                // ⭐ FALLBACK: kalau DB kosong, pakai user apps
+                // Fallback: kalau DB kosong, pakai user apps
                 if (killApps.isEmpty()) {
                     Log.w(TAG, "No running apps, using fallback (user apps)")
                     killApps = AppRepository.getInstalledApps(
@@ -74,26 +74,34 @@ class QuickActionActivity : AppCompatActivity() {
 
                 // ===== FASE 2: Ambil apps untuk CLEAR CACHE =====
                 Log.i(TAG, "Phase 2: Getting apps to clean")
-                val userApps = AppRepository.getInstalledApps(
+                val userApps: List<AppInfo> = AppRepository.getInstalledApps(
                     this@QuickActionActivity,
                     includeSystem = false
                 )
-                val systemApps = AppRepository.getSafeSystemApps(this@QuickActionActivity)
-                val candidateApps = (userApps + systemApps).distinctBy { it.packageName }
-
-                val cacheSizes = CacheSizeFetcher.getCacheSizes(
-                    this@QuickActionActivity,
-                    candidateApps.map { it.packageName }
+                val systemApps: List<AppInfo> = AppRepository.getSafeSystemApps(
+                    this@QuickActionActivity
                 )
+                val candidateApps: List<AppInfo> = (userApps + systemApps)
+                    .distinctBy { app: AppInfo -> app.packageName }
 
-                val cleanApps = candidateApps.filter { app ->
-                    val cacheSize = cacheSizes[app.packageName] ?: 0L
+                Log.i(TAG, "Candidate apps: ${candidateApps.size}")
+
+                // Query cache size
+                val cacheSizes: Map<String, Long> = CacheSizeFetcher.getCacheSizes(
+                    this@QuickActionActivity,
+                    candidateApps.map { app: AppInfo -> app.packageName }
+                )
+                Log.i(TAG, "Cache sizes retrieved: ${cacheSizes.size}")
+
+                // Filter cache >= 10 MB
+                val cleanApps: List<AppInfo> = candidateApps.filter { app: AppInfo ->
+                    val cacheSize: Long = cacheSizes[app.packageName] ?: 0L
                     cacheSize >= MIN_CACHE_SIZE
                 }
                 Log.i(TAG, "Apps to clean (≥ 10 MB): ${cleanApps.size}")
 
                 // ===== TOTAL =====
-                val totalTasks = killApps.size + cleanApps.size
+                val totalTasks: Int = killApps.size + cleanApps.size
                 Log.i(TAG, "Total: kill=${killApps.size}, clean=${cleanApps.size}, all=$totalTasks")
 
                 if (totalTasks == 0) {
@@ -107,10 +115,11 @@ class QuickActionActivity : AppCompatActivity() {
                 }
 
                 // ===== SETUP =====
-                val service = AutomationAccessibilityService.instance ?: run {
-                    goHome()
-                    return@launch
-                }
+                val service: AutomationAccessibilityService =
+                    AutomationAccessibilityService.instance ?: run {
+                        goHome()
+                        return@launch
+                    }
 
                 AutomationAccessibilityService.onStopClick = {
                     service.cancelQueue()
@@ -118,8 +127,8 @@ class QuickActionActivity : AppCompatActivity() {
                     goHome()
                 }
 
-                // Mode overlay — KILLER kalau tidak ada clean
-                val mode = if (cleanApps.isNotEmpty()) {
+                // Mode overlay
+                val mode: String = if (cleanApps.isNotEmpty()) {
                     AutomationAccessibilityService.MODE_CLEANER
                 } else {
                     AutomationAccessibilityService.MODE_KILLER
@@ -128,11 +137,11 @@ class QuickActionActivity : AppCompatActivity() {
                 service.showOverlay(0, totalTasks, "", mode)
 
                 // ===== BUILD TASKS =====
-                val allTasks = mutableListOf<AutomationTask>()
+                val allTasks: MutableList<AutomationTask> = mutableListOf<AutomationTask>()
 
-                // ⭐ Task KILL — pakai 3 parameter (pkg, label, steps)
-                killApps.forEach { app ->
-                    val steps = mutableListOf<ActionStep>()
+                // Task KILL
+                killApps.forEach { app: AppInfo ->
+                    val steps: MutableList<ActionStep> = mutableListOf<ActionStep>()
                     steps.add(ActionStep.OpenAppInfo(app.packageName))
                     steps.add(ActionStep.Wait(300))
                     steps.add(ActionStep.ClickByText(OemProfile.forceStopButtonLabels))
@@ -141,33 +150,48 @@ class QuickActionActivity : AppCompatActivity() {
                     steps.add(ActionStep.Wait(200))
                     steps.add(ActionStep.Back)
                     steps.add(ActionStep.Wait(150))
-                    allTasks.add(AutomationTask(app.packageName, app.label, steps))
+
+                    allTasks.add(
+                        AutomationTask(
+                            app.packageName,
+                            app.label,
+                            steps
+                        )
+                    )
                 }
 
-                // ⭐ Task CLEAN — pakai 3 parameter
-                cleanApps.forEach { app ->
-                    val steps = mutableListOf<ActionStep>()
+                // Task CLEAN
+                cleanApps.forEach { app: AppInfo ->
+                    val steps: MutableList<ActionStep> = mutableListOf<ActionStep>()
                     steps.add(ActionStep.OpenAppInfo(app.packageName))
                     steps.add(ActionStep.Wait(400))
                     steps.add(ActionStep.ClickByText(OemProfile.storageMenuLabels))
                     steps.add(ActionStep.Wait(400))
-                    steps.add(ActionStep.ClickByTextSafe(
-                        OemProfile.clearCacheLabels,
-                        OemProfile.clearDataLabels
-                    ))
+                    steps.add(
+                        ActionStep.ClickByTextSafe(
+                            OemProfile.clearCacheLabels,
+                            OemProfile.clearDataLabels
+                        )
+                    )
                     steps.add(ActionStep.Wait(400))
                     steps.add(ActionStep.Back)
                     steps.add(ActionStep.Wait(200))
                     steps.add(ActionStep.Back)
                     steps.add(ActionStep.Wait(200))
-                    allTasks.add(AutomationTask(app.packageName, app.label, steps))
+
+                    allTasks.add(
+                        AutomationTask(
+                            app.packageName,
+                            app.label,
+                            steps
+                        )
+                    )
                 }
 
                 // ===== RUN =====
                 service.runQueue(
                     tasks = allTasks,
-                    onProgress = { current, total, appLabel ->
-                        // ⭐ Pakai appLabel (bukan pkg)
+                    onProgress = { current: Int, total: Int, appLabel: String ->
                         service.updateOverlay(current, total, appLabel)
                     },
                     onComplete = { stats ->
@@ -175,7 +199,7 @@ class QuickActionActivity : AppCompatActivity() {
                             service.hideOverlay()
                             AutomationAccessibilityService.onStopClick = null
 
-                            // ⭐ Kill Settings task
+                            // Kill Settings task
                             killSettingsTask()
 
                             Toast.makeText(
@@ -219,7 +243,7 @@ class QuickActionActivity : AppCompatActivity() {
     }
 
     /**
-     * Kill task Settings (App Info) supaya Back keluar dari Toolsku.
+     * Kill task Settings (App Info).
      */
     private fun killSettingsTask() {
         try {
