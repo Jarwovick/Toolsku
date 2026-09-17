@@ -233,41 +233,12 @@
                 android:textSize="24sp" />
         </LinearLayout>
 
-        <!-- Tombol: Buat Shortcut -->
-        <LinearLayout
-            android:id="@+id/btnCreateShortcut"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:background="@drawable/bg_menu_card"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="horizontal"
-            android:padding="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="⚡"
-                android:textSize="20sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/shortcut_create_button"
-                android:textColor="@color/accent"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
         <!-- Settings -->
         <LinearLayout
             android:id="@+id/btnSettings"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="32dp"
             android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
