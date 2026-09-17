@@ -7,14 +7,8 @@ import android.view.accessibility.AccessibilityNodeInfo
  * Tiru dari `rj2` Baxa.
  */
 interface ActionStep {
-    /**
-     * Mulai step — dipanggil sekali.
-     */
     fun start(): StepResult
 
-    /**
-     * Handle accessibility event.
-     */
     fun handleEvent(
         packageName: String,
         className: String,
@@ -22,28 +16,33 @@ interface ActionStep {
         node: AccessibilityNodeInfo?
     ): StepResult
 
-    /**
-     * Stop step — cleanup.
-     */
     fun stop()
 
-    /**
-     * Cek apakah step masih berjalan.
-     */
     fun isRunning(): Boolean
 
-    /**
-     * Nama step (untuk debug).
-     */
     fun getName(): String
 
-    /**
-     * Event types yang di-handle step ini.
-     */
     fun getSupportedEvents(): List<Int>
 
-    /**
-     * Handle pause.
-     */
     fun pause()
+
+    /**
+     * Set parent task (untuk callback).
+     */
+    fun setParentTask(task: TaskStateMachine)
+
+    /**
+     * Set current window id.
+     */
+    fun setCurrentWindowId(windowId: Int)
+
+    /**
+     * Get current window id.
+     */
+    fun getCurrentWindowId(): Int
+
+    /**
+     * Handle state machine result — callback dari parent.
+     */
+    fun onResult(result: StepResult)
 }
