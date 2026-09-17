@@ -18,30 +18,33 @@ interface RunningAppDao {
         SELECT * FROM running_apps 
         WHERE isClosed = 0 
           AND isUnclosable = 0 
+          AND isAutoRestarted = 0
           AND isSystem = 0
         ORDER BY lastUsed DESC
     """)
     suspend fun getRunningUserApps(): List<RunningAppEntity>
 
     /**
-     * Ambil running SYSTEM apps (belum ditutup, belum auto-restart, belum unclosable).
+     * Ambil running SYSTEM apps.
      */
     @Query("""
         SELECT * FROM running_apps 
         WHERE isClosed = 0 
           AND isUnclosable = 0 
+          AND isAutoRestarted = 0
           AND isSystem = 1
         ORDER BY lastUsed DESC
     """)
     suspend fun getRunningSystemApps(): List<RunningAppEntity>
 
     /**
-     * Ambil semua running apps (user + system).
+     * Ambil semua running apps.
      */
     @Query("""
         SELECT * FROM running_apps 
         WHERE isClosed = 0 
           AND isUnclosable = 0 
+          AND isAutoRestarted = 0
         ORDER BY lastUsed DESC
     """)
     suspend fun getRunningApps(): List<RunningAppEntity>
@@ -58,6 +61,9 @@ interface RunningAppDao {
     @Query("UPDATE running_apps SET isUnclosable = 1 WHERE packageName = :pkg")
     suspend fun markUnclosable(pkg: String)
 
+    /**
+     * Reset flags saat app dibuka kembali.
+     */
     @Query("""
         UPDATE running_apps 
         SET isClosed = 0, 
@@ -65,6 +71,17 @@ interface RunningAppDao {
         WHERE packageName IN (:packages)
     """)
     suspend fun resetFlags(packages: List<String>)
+
+    /**
+     * Reset flags satu app.
+     */
+    @Query("""
+        UPDATE running_apps 
+        SET isClosed = 0, 
+            isAutoRestarted = 0 
+        WHERE packageName = :pkg
+    """)
+    suspend fun resetFlagsSingle(pkg: String)
 
     @Query("DELETE FROM running_apps WHERE packageName = :pkg")
     suspend fun delete(pkg: String)
