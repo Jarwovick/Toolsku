@@ -14,8 +14,42 @@ object AppRepository {
     private const val TAG = "AppRepo"
 
     /**
-     * Ambil daftar SEMUA app terinstall (user + system).
-     * Untuk dialog SELECT APPS.
+     * Ambil daftar app terinstall.
+     * @param includeSystem true = user + system, false = user saja
+     */
+    suspend fun getInstalledApps(
+        context: Context,
+        includeSystem: Boolean = false
+    ): List<AppInfo> = withContext(Dispatchers.IO) {
+        val pm = context.packageManager
+        val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+        val result = mutableListOf<AppInfo>()
+        val ourPackage = context.packageName
+
+        for (app in packages) {
+            if (app.packageName == ourPackage) continue
+
+            val isSystem = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+            if (SystemApps.isDangerousSystemApp(app.packageName)) continue
+            if (!includeSystem && isSystem) continue
+
+            result.add(
+                AppInfo(
+                    packageName = app.packageName,
+                    label = pm.getApplicationLabel(app).toString(),
+                    icon = try { pm.getApplicationIcon(app) } catch (e: Exception) { null },
+                    isSystem = isSystem,
+                    isException = Prefs.isException(app.packageName)
+                )
+            )
+        }
+
+        result.sortBy { it.label.lowercase() }
+        result
+    }
+
+    /**
+     * Ambil SEMUA app (user + system) untuk dialog SELECT APPS.
      */
     suspend fun getAllApps(context: Context, onlyUser: Boolean = false): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -46,8 +80,7 @@ object AppRepository {
         }
 
     /**
-     * Ambil daftar SEMUA app terinstall (user + safe system).
-     * Untuk CLEANER — TIDAK filter exception.
+     * Untuk CLEANER — semua app (kecuali dangerous), abaikan exception.
      */
     suspend fun getAllAppsForCleaner(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -58,8 +91,6 @@ object AppRepository {
 
             for (app in packages) {
                 if (app.packageName == ourPackage) continue
-
-                // Skip HANYA dangerous system apps
                 if (SystemApps.isDangerousSystemApp(app.packageName)) continue
 
                 val isSystem = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
@@ -70,7 +101,7 @@ object AppRepository {
                         label = pm.getApplicationLabel(app).toString(),
                         icon = try { pm.getApplicationIcon(app) } catch (e: Exception) { null },
                         isSystem = isSystem,
-                        isException = false  // Cleaner abaikan exception
+                        isException = false
                     )
                 )
             }
@@ -81,7 +112,7 @@ object AppRepository {
         }
 
     /**
-     * Ambil daftar app di exception list.
+     * Ambil exception apps.
      */
     suspend fun getExceptionApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -110,7 +141,7 @@ object AppRepository {
                         )
                     )
                 } catch (e: PackageManager.NameNotFoundException) {
-                    // Skip yang tidak terinstall
+                    // Skip
                 }
             }
 
@@ -119,8 +150,7 @@ object AppRepository {
         }
 
     /**
-     * Ambil running USER apps dari DB.
-     * Untuk KILLER — filter exception + isClosed.
+     * Running USER apps dari DB (untuk KILLER).
      */
     suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
@@ -150,7 +180,7 @@ object AppRepository {
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to get running apps from DB", e)
+            Log.e(TAG, "Failed to get running apps", e)
         }
 
         result.sortBy { it.label.lowercase() }
@@ -158,8 +188,7 @@ object AppRepository {
     }
 
     /**
-     * Ambil running SAFE system apps dari DB.
-     * Untuk KILLER — filter exception + isClosed + safe only.
+     * Running SAFE system apps dari DB (untuk KILLER).
      */
     suspend fun getSafeSystemApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
