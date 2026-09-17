@@ -6,13 +6,13 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.util.Log
+import com.toolsku.app.core.db.DatabaseProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object AppRepository {
 
     private const val TAG = "AppRepo"
-    private const val USAGE_THRESHOLD_MS = 5 * 60 * 1000L  // 5 menit
 
     /**
      * Ambil daftar SEMUA app terinstall (user + system).
@@ -49,7 +49,7 @@ object AppRepository {
 
     /**
      * Ambil daftar app di exception list.
-     * HANYA app yang masih terinstall — skip yang tidak terinstall.
+     * HANYA app yang masih terinstall.
      */
     suspend fun getExceptionApps(context: Context): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -81,7 +81,6 @@ object AppRepository {
                     )
                     Log.d(TAG, "Found: $pkg — $label")
                 } catch (e: PackageManager.NameNotFoundException) {
-                    // App TIDAK terinstall — SKIP
                     Log.w(TAG, "SKIP (not installed): $pkg")
                 }
             }
@@ -93,7 +92,6 @@ object AppRepository {
 
     /**
      * Ambil semua app untuk dialog SELECT APPS.
-     * TIDAK filter dangerous — user boleh pilih apa saja.
      */
     suspend fun getAllApps(context: Context, onlyUser: Boolean = false): List<AppInfo> =
         withContext(Dispatchers.IO) {
@@ -154,93 +152,46 @@ object AppRepository {
         }
 
     /**
-     * Ambil daftar app RUNNING (kombinasi 3 metode).
+     * Ambil daftar app RUNNING dari DATABASE.
+     * App yang pernah dibuka + belum ditutup + belum auto-restart + belum unclosable.
      */
     suspend fun getRunningApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
-        val ourPackage = context.packageName
-        val runningPackages = mutableSetOf<String>()
-
-        // === 1. getRunningAppProcesses ===
-        try {
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val processes = am.runningAppProcesses
-            if (processes != null) {
-                for (process in processes) {
-                    if (process.pkgList == null) continue
-                    for (pkg in process.pkgList) {
-                        if (pkg != ourPackage) runningPackages.add(pkg)
-                    }
-                }
-            }
-            Log.d(TAG, "Method 1 (Processes): ${runningPackages.size}")
-        } catch (e: Exception) {
-            Log.e(TAG, "getRunningAppProcesses failed", e)
-        }
-
-        // === 2. getRunningServices ===
-        try {
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            @Suppress("DEPRECATION")
-            val services = am.getRunningServices(200)
-            for (service in services) {
-                val pkg = service.service.packageName
-                if (pkg != ourPackage) runningPackages.add(pkg)
-            }
-            Log.d(TAG, "Method 2 (Services): ${runningPackages.size}")
-        } catch (e: Exception) {
-            Log.e(TAG, "getRunningServices failed", e)
-        }
-
-        // === 3. UsageStatsManager (5 menit) ===
-        try {
-            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-            val endTime = System.currentTimeMillis()
-            val beginTime = endTime - USAGE_THRESHOLD_MS
-
-            val usageStats = usm.queryUsageStats(
-                UsageStatsManager.INTERVAL_DAILY,
-                beginTime,
-                endTime
-            )
-            if (usageStats != null) {
-                for (stat in usageStats) {
-                    val pkg = stat.packageName ?: continue
-                    val timeSinceLastUse = endTime - stat.lastTimeUsed
-                    if (timeSinceLastUse <= USAGE_THRESHOLD_MS && pkg != ourPackage) {
-                        runningPackages.add(pkg)
-                    }
-                }
-            }
-            Log.d(TAG, "Method 3 (UsageStats): ${runningPackages.size}")
-        } catch (e: Exception) {
-            Log.e(TAG, "UsageStats failed", e)
-        }
-
-        // === Convert ===
         val result = mutableListOf<AppInfo>()
-        for (pkg in runningPackages) {
-            if (pkg == ourPackage) continue
-            if (SystemApps.isDangerousSystemApp(pkg)) continue
-            if (Prefs.isException(pkg)) continue
 
-            try {
-                val appInfo = pm.getApplicationInfo(pkg, 0)
-                val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                if (isSystem) continue
+        try {
+            val dao = DatabaseProvider.runningAppDao()
+            val entities = dao.getRunningApps()
 
-                result.add(
-                    AppInfo(
-                        packageName = pkg,
-                        label = pm.getApplicationLabel(appInfo).toString(),
-                        icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
-                        isSystem = false,
-                        isException = false
+            Log.i(TAG, "DB running apps: ${entities.size}")
+
+            for (entity in entities) {
+                if (SystemApps.isDangerousSystemApp(entity.packageName)) continue
+                if (Prefs.isException(entity.packageName)) continue
+
+                try {
+                    val appInfo = pm.getApplicationInfo(entity.packageName, 0)
+                    val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+
+                    // Skip system apps — mereka di-handle oleh getSafeSystemApps
+                    if (isSystem) continue
+
+                    result.add(
+                        AppInfo(
+                            packageName = entity.packageName,
+                            label = pm.getApplicationLabel(appInfo).toString(),
+                            icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null },
+                            isSystem = false,
+                            isException = false
+                        )
                     )
-                )
-            } catch (e: Exception) {
-                // Skip
+                } catch (e: Exception) {
+                    // App sudah uninstall — hapus dari DB
+                    dao.delete(entity.packageName)
+                }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get running apps from DB", e)
         }
 
         result.sortBy { it.label.lowercase() }
