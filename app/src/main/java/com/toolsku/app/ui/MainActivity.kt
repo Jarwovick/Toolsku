@@ -98,17 +98,8 @@ class MainActivity : ComponentActivity() {
                 title = "Hentikan Aplikasi",
                 description = "Paksa berhenti aplikasi berjalan",
                 onClick = {
-                    if (checkAndRequestPermissions()) {
-                        ToolskuAccessibilityService.isAutoStopRunning = true
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Mulai menghentikan aplikasi...",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        // Buka menu Settings aplikasi untuk memicu otomatisasi Accessibility
-                        val intent = Intent(Settings.ACTION_APPLICATION_SETTINGS)
-                        startActivity(intent)
-                    }
+                    val intent = Intent(this@MainActivity, KillerActivity::class.java)
+                    startActivity(intent)
                 }
             )
 
@@ -119,17 +110,8 @@ class MainActivity : ComponentActivity() {
                 title = "Bersihkan Cache",
                 description = "Hapus cache semua aplikasi",
                 onClick = {
-                    if (checkAndRequestPermissions()) {
-                        ToolskuAccessibilityService.isAutoClearCacheRunning = true
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Mulai membersihkan cache...",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        // Buka menu Storage Settings untuk memicu otomatisasi Accessibility
-                        val intent = Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
-                        startActivity(intent)
-                    }
+                    val intent = Intent(this@MainActivity, CacheCleanerActivity::class.java)
+                    startActivity(intent)
                 }
             )
 
@@ -248,20 +230,6 @@ class MainActivity : ComponentActivity() {
     }
 
     // --- FUNGSI MANAJEMEN IZIN & VALIDASI ---
-
-    private fun checkAndRequestPermissions(): Boolean {
-        if (!isAccessibilityServiceEnabled()) {
-            Toast.makeText(this, "Aktifkan Layanan Aksesibilitas untuk Toolsku", Toast.LENGTH_LONG).show()
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            return false
-        }
-        if (!Settings.canDrawOverlays(this)) {
-            Toast.makeText(this, "Izinkan Toolsku Menampilkan di Atas Aplikasi Lain", Toast.LENGTH_LONG).show()
-            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-            return false
-        }
-        return true
-    }
 
     private fun openPermissionSettings() {
         if (!isAccessibilityServiceEnabled()) {
