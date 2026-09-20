@@ -46,6 +46,12 @@
             android:exported="false"
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
+        <!-- Halaman Exception List -->
+        <activity
+            android:name=".ui.ExceptionListActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
         <!-- Accessibility Service untuk Otomasi Killer & Cache Cleaner -->
         <service
             android:name=".service.ToolskuAccessibilityService"
