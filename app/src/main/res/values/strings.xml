@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Toolsku</string>
+    <string name="accessibility_description">Diperlukan oleh Toolsku untuk mengotomatiskan tindakan Force Stop dan Clear Cache pada aplikasi.</string>
+</resources>
