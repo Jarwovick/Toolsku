@@ -29,7 +29,8 @@ PRG="$0"
 while [ -h "$PRG" ]; do
     ls=`ls -ld "$PRG"`
     link=`expr "$ls" : '.*-> \(.*\)$'`
-    if expr "$link" : '/.*' > /dev/null; -> $link"
+    if expr "$link" : '/.*' > /dev/null; then
+        PRG="$link"
     else
         PRG=`dirname "$PRG"`/"$link"
     fi
@@ -48,7 +49,7 @@ DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 
 # Use the maximum available RAM if this JVM is running in a container
 if [ -r /proc/1/cgroup ] && grep -qE '(lxc|docker)' /proc/1/cgroup; then
-    DEFAULT_JVM_OPTS='$DEFAULT_JVM_OPTS "-XX:+UseContainerSupport"'
+    DEFAULT_JVM_OPTS="$DEFAULT_JVM_OPTS \"-XX:+UseContainerSupport\""
 fi
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
@@ -61,17 +62,17 @@ if [ -n "$JAVA_HOME" ] ; then
         JAVACMD="$JAVA_HOME/bin/java"
     fi
     if [ ! -x "$JAVACMD" ] ; then
-        die "JAVA_HOME is set to an invalid directory: $JAVA_HOME
-
-Please set the JAVA_HOME variable in your environment to match the
-location of your Java installation."
+        echo "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME" >&2
+        echo "Please set the JAVA_HOME variable in your environment to match the location of your Java installation." >&2
+        exit 1
     fi
 else
     JAVACMD="java"
-    which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
-
-Please set the JAVA_HOME variable in your environment to match the
-location of your Java installation."
+    which java >/dev/null 2>&1 || {
+        echo "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH." >&2
+        echo "Please set the JAVA_HOME variable in your environment to match the location of your Java installation." >&2
+        exit 1
+    }
 fi
 
 # Increase the maximum file descriptors if we can.
@@ -80,15 +81,9 @@ case "`uname`" in
         MAX_FD_LIMIT=`ulimit -H -n`
         if [ $? -eq 0 ] ; then
             ulimit -n $MAX_FD_LIMIT
-            if [ $? -ne 0 ] ; then
-                warn "Could not set maximum file descriptor limit: $MAX_FD_LIMIT"
-            fi
         fi
         ;;
 esac
 
-# For Darwin, add options to specify how the application appears in the dock
-JAVA_OPTS="$JAVA_OPTS "-Xdock:name=$APP_NAME" "-Xdock:icon=$APP_HOME/media/gradle.ico""
-
 # Escape application args
-exec "$JAVACMD" "${JVM_OPTS[@]}" "-classpath" "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+exec "$JAVACMD" "-classpath" "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
