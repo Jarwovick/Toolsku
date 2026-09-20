@@ -27,6 +27,18 @@
             </intent-filter>
         </activity>
 
+        <!-- Activity Hentikan Aplikasi (Killer) -->
+        <activity
+            android:name=".ui.KillerActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
+        <!-- Activity Bersihkan Cache -->
+        <activity
+            android:name=".ui.CacheCleanerActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
         <!-- Accessibility Service untuk Otomasi Force Stop & Clear Cache -->
         <service
             android:name=".service.ToolskuAccessibilityService"
