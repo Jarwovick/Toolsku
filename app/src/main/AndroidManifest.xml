@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Izin Utama -->
+    <!-- Izin Utama Sistem -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
@@ -10,12 +10,13 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_launcher"
         android:label="Toolsku"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@drawable/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
+        <!-- Activity Utama (Dashboard) -->
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
@@ -26,7 +27,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Accessibility Service untuk Killer & Cache Cleaner -->
+        <!-- Accessibility Service untuk Otomasi Force Stop & Clear Cache -->
         <service
             android:name=".service.ToolskuAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
@@ -39,7 +40,7 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- Service untuk Overlay Peredupan Layar -->
+        <!-- Foreground Service untuk Overlay Peredupan Layar -->
         <service
             android:name=".service.ScreenDimmerService"
             android:enabled="true"
